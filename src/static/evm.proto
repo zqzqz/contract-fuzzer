@@ -8,10 +8,10 @@ package evm;
 service EVM {
 
   rpc Reset(Status) returns (Status) {}
-  rpc GetAccounts(Status) returns (Json) {}
+  rpc GetAccounts(Status) returns (stream Json) {}
   rpc Compile(Source) returns (Json) {}
-  rpc Deploy(Json) returns (Address) {}
-  rpc SendTx(SendTxData) returns (Json) {}
+  rpc Deploy(Json) returns (stream Address) {}
+  rpc SendTx(SendTxData) returns (stream Json) {}
   
 }
 
@@ -38,9 +38,9 @@ message Address {
 
 message SendTxData {
   // address of caller
-  string from = 1;
+  string fromAddr = 1;
   // address of callee
-  string to = 2;
+  string toAddr = 2;
   // hex string of sent value
   string value = 3;
   // hex string of payload

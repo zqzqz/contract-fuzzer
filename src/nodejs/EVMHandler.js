@@ -102,12 +102,12 @@ EVMHandler = {
       async.eachSeries(accList, (acc, next) => {
         EVMHandler.vm.stateManager.getAccountBalance(acc, (err, balance) => {
           if (err) reject(err);
-          accountsWithBalance[acc] = balance;
+          accountsWithBalance[acc] = utileth.bufferToHex(balance);
           next();
         })
-      }), (err) => {
+      }, (err) => {
         resolve(accountsWithBalance);
-      }
+      })
     })
   },
 

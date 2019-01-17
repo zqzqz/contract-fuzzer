@@ -1,4 +1,8 @@
 .vscode
 node_modules
 package-lock.json
-/venv
+bin
+include
+lib
+__pycache__
+pip-selfcheck.json
