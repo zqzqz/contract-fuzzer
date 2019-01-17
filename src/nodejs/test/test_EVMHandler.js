@@ -1,9 +1,10 @@
 const fs = require('fs');
+const path = require('path');
 let evm = require("../EVMHandler");
 let blockchain = require("../blockchain");
 
 let name = "Test";
-let source = fs.readFileSync("Test.sol", 'utf-8');
+let source = fs.readFileSync(path.join(__dirname, "Test.sol"), 'utf-8');
 let address = null;
 let txhash = null;
 

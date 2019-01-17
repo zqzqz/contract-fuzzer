@@ -5,3 +5,9 @@ indent_style = space
 indent_size = 2
 end_of_line = lf
 charset = utf-8
+
+[*.proto]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8

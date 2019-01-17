@@ -8,6 +8,7 @@ const Block = require('ethereumjs-block')
 const BN = require('ethereumjs-util').BN
 const remixLib = require('remix-lib')
 const Debugger = require('remix-debug').EthDebugger
+const async = require('async')
 
 privateKeys = [
   Buffer.from('c87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3', 'hex'),
@@ -38,16 +39,9 @@ EVMHandler = {
   // a nonce
   t: 12,
 
-  // compile a contract source to a contract object
-  compile: (source, name) => {
-    let filename = "filename";
-    let output = solc.compile({ 'sources': { filename: source } }, 1);
-    let contract_name = filename + ":" + name;
-    let contract = output.contracts[contract_name];
-    return contract;
-  },
-
   init: () => {
+    EVMHandler.accounts = {}
+    EVMHandler.contracts = {}
     EVMHandler.vm = EVMHandler.initVM()
     EVMHandler.web3vm = new remixLib.vm.Web3VMProvider()
     EVMHandler.web3vm.setVM(EVMHandler.vm)
@@ -90,6 +84,31 @@ EVMHandler = {
       }
     })
     return vm
+  },
+
+    // compile a contract source to a contract object
+  compile: (source, name) => {
+    let filename = "filename";
+    let output = solc.compile({ 'sources': { filename: source } }, 1);
+    let contract_name = filename + ":" + name;
+    let contract = output.contracts[contract_name];
+    return contract;
+  },
+
+  getAccounts: () => {
+    return new Promise((resolve, reject) => {
+      let accList = Object.keys(EVMHandler.accounts);
+      let accountsWithBalance = {};
+      async.eachSeries(accList, (acc, next) => {
+        EVMHandler.vm.stateManager.getAccountBalance(acc, (err, balance) => {
+          if (err) reject(err);
+          accountsWithBalance[acc] = balance;
+          next();
+        })
+      }), (err) => {
+        resolve(accountsWithBalance);
+      }
+    })
   },
 
   // deploy a new contract; take compiled contract from solc as input

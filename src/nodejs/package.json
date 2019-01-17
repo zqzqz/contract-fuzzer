@@ -1,7 +1,10 @@
 {
     "dependencies": {
+        "@grpc/proto-loader": "^0.3.0",
+        "async": "^2.6.1",
         "ganache-cli": "^6.2.5",
         "geth": "^0.4.0",
+        "grpc": "^1.18.0",
         "remix-debug": "^0.3.1",
         "solc": "^0.4.25",
         "web3": "^1.0.0-beta.37"

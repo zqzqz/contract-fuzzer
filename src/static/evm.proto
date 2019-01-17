@@ -1,0 +1,48 @@
+// grpc interface for EVM environment (nodejs server & python client)
+
+syntax = "proto3";
+
+package evm;
+
+// Interface exported by the server.
+service EVM {
+
+  rpc Reset(Status) returns (Status) {}
+  rpc GetAccounts(Status) returns (Json) {}
+  rpc Compile(Source) returns (Json) {}
+  rpc Deploy(Json) returns (Address) {}
+  rpc SendTx(SendTxData) returns (Json) {}
+  
+}
+
+message Status {
+  uint32 option = 1;
+}
+
+message Source {
+  // plain string of contract source
+  string text = 1;
+  // contract name
+  string name = 2;
+}
+
+message Json {
+  // json string of solc output
+  string data = 1;
+}
+
+message Address {
+  // hex string of address, e.g. "0x1234..."
+  string address = 1;
+}
+
+message SendTxData {
+  // address of caller
+  string from = 1;
+  // address of callee
+  string to = 2;
+  // hex string of sent value
+  string value = 3;
+  // hex string of payload
+  string data = 4;
+}
