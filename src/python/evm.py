@@ -1,4 +1,4 @@
-"python interface for evm functions"
+"""python interface for evm functions"""
 
 import json
 import grpc
@@ -70,4 +70,5 @@ def test():
     address = deploy(contract)
     print(address)
 
-test()
+if __name__ == "__main__":
+    test()
