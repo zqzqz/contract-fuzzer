@@ -6,7 +6,8 @@ contract Test {
         owner = msg.sender;
     }
 
-    function test() public {
+    function test(uint a) public returns (uint) {
         owner = msg.sender;
+        return a + 1;
     }
 }

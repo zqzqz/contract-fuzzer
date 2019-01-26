@@ -11,6 +11,7 @@ let txhash = null;
 evm.init()
 let accs = Object.keys(evm.accounts);
 let contract = evm.compile(source, name);
+// console.log(contract)
 evm.deploy(contract).then((result) => {
   console.log("contract deployed:", result.tx.contractAddress);
   return evm.sendFormatTx(accs[1], result.tx.contractAddress, 0, "test", [])
