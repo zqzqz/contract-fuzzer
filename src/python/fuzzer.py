@@ -1,33 +1,48 @@
-import evm
-from interface import contractAbi, Transaction
+from evm import *
+from interface import ContractAbi, Transaction
 import types
 import logging
+from random import randint
+
+from model import *
 
 
 class ArgsPool():
     def __init__(self):
         pass
 
+
 class Fuzzer():
-    def __init__(self, evmEndPoint, maxFuncNum, maxCallNum):
+    def __init__(self, maxFuncNum=3, maxCallNum=3, evmEndPoint=None):
         self.argsPool = ArgsPool()
-        self.evm = EvmHandler(evmEndPoint)
+        if evmEndPoint:
+            self.evm = EvmHandler(evmEndPoint)
+        else:
+            self.evm = EvmHandler()
         self.contract = None
         self.contractAddress = None
         self.contractAbi = None
         self.maxFuncNum = maxFuncNum
         self.maxCallNum = maxCallNum
+        self.state = None
+        self.stateProcessor = StateProcessor(maxFuncNum, maxCallNum)
+        self.actionProcessor = ActionProcessor(maxFuncNum, maxCallNum)
+        self.traces = []
+        self.reports = []
+        self.accounts = self.evm.getAccounts()
+        self.defaultAccount = list(accJson.keys())[0]
 
     def loadContract(self, source, name):
         self.contract = evm.compile(source, name)
-        self.contractAddress = evm.deploy(self.contract)
+        # self.contractAddress = evm.deploy(self.contract)
         self.contractAbi = ContractAbi(self.contract)
 
     def runOneTx(self, tx):
         if self.contract == None:
             logging.error("Contract have not been loaded.")
             return None
-        trace = evm.sendTx(tx.sender, self.contractAbi, tx.value, tx.payload)
+        trace = evm.sendTx(tx.sender, self.contractAddress,
+                           tx.value, tx.payload)
         return trace
 
     def runTxs(self, txList):
@@ -36,6 +51,92 @@ class Fuzzer():
             trace.append(self.runOneTx(tx))
         return traces
 
-    def mutate(self, txList):
-        pass
-        
+    def reward(self, traces):
+        return 0, []
+
+    def mutate(self, state, action):
+        txList = state.txList + []
+        actionId = action.actionId
+        actionArg = action.actionArg
+        if actionId >= 0 and actionId < 2:
+            # insert
+            if actionArg < 0 or actionArg >= len(self.contractAbi.funcHashList):
+                return None
+            tx = self.contractAbi.generateTx(
+                self.contractAbi.funcHashList[actionArg], self.defaultAccount)
+            if actionId == 0:
+                # insert at first
+                txList.insert(0, tx)
+            else:
+                # insert at last
+                txList.append(tx)
+        elif actionId < 4:
+            # remove
+            if len(txList) <= 0:
+                # cannot remove
+                return None
+            if actionId == 2:
+                # remove the first
+                del txList[0]
+            else:
+                # remove the last
+                txList.pop()
+        elif actionId < 7:
+            # modify
+            if actionArg < 0 or actionArg >= len(txList):
+                return None
+            funcHash = state.txList[actionArg].hash
+            if actionId == 4:
+                # modify args
+                txList[actionArg].args = self.contractAbi.generateTxArgs(
+                    funcHash)
+            elif actionId == 5:
+                # modify sender
+                sender = state.txList[actionArg].sender
+                attempt = 100
+                while sender == state.txList[actionArg].sender and attempt > 0:
+                    randIndex = randint(0, len(self.accounts.keys())-1)
+                    sender = list(self.accounts.keys())[randIndex]
+                    attempt -= 1
+                txList[actionArg].sender = sender
+            else:
+                # modify value
+                if not self.contractAbi.interface[funcHash]['payable']:
+                    # not payable function
+                    return None
+                value = state.txList[actionArg].value
+                attempt = 100
+                while value == state.txList[actionArg].value and attempt > 0:
+                    value = self.contractAbi.generateTxValue(funcHash)
+                    attempt -= 1
+                txList[actionArg].value = value
+        else:
+            return None
+        return State(state.staticAnalysis, txList)
+
+    def reset(self):
+        if not self.contract:
+            logging.error("Contract not inintialized in fuzzer.")
+            return
+        self.contractAddress = evm.deploy(self.contract)
+        # todo
+        self.state = State(None, [])
+        self.traces = []
+        self.reports = []
+        # randomFuncIndex = randint(0, len(self.contractAbi.funcHashList)-1)
+        # self.state = self.mutate(self.state, actionProcessor.encode(0, randomFuncIndex))
+        return self.stateProcessor.encode(self.state)
+
+    def step(self, action):
+        action = self.actionProcessor.decode(action)
+        nextState = self.mutate(state, action)
+        if not nextState:
+            return self.state, 0, 0
+        traces = self.runTxs(nextState.txList)
+        reward, report = self.reward(traces)
+        # update
+        self.state = nextState
+        self.traces = traces
+        # should exclude repeated reports: todo
+        self.reports += report
+        return self.stateProcessor.encode(self.state), reward

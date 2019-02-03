@@ -100,9 +100,14 @@ EVMHandler = {
       let accList = Object.keys(EVMHandler.accounts);
       let accountsWithBalance = {};
       async.eachSeries(accList, (acc, next) => {
-        EVMHandler.vm.stateManager.getAccountBalance(acc, (err, balance) => {
+        // acc = Buffer.from(acc, "hex")
+        if (utileth.isHexPrefixed(acc)) {
+          acc = acc.replace("0x", "")
+        }
+        accBuf = Buffer.from(acc, "hex")
+        EVMHandler.vm.stateManager.getAccountBalance(accBuf, (err, balance) => {
           if (err) reject(err);
-          accountsWithBalance[acc] = utileth.bufferToHex(balance);
+          accountsWithBalance["0x" + acc] = utileth.bufferToHex(balance);
           next();
         })
       }, (err) => {
