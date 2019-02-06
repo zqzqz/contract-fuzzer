@@ -5,6 +5,7 @@ import logging
 from random import randint
 
 from model import *
+from trace import *
 
 
 class ArgsPool():
@@ -25,34 +26,53 @@ class Fuzzer():
         self.maxFuncNum = maxFuncNum
         self.maxCallNum = maxCallNum
         self.state = None
+        self.seqLen = None
         self.stateProcessor = StateProcessor(maxFuncNum, maxCallNum)
         self.actionProcessor = ActionProcessor(maxFuncNum, maxCallNum)
         self.traces = []
         self.reports = []
         self.accounts = self.evm.getAccounts()
-        self.defaultAccount = list(accJson.keys())[0]
+        self.defaultAccount = list(self.accounts.keys())[1]
+        self.traceAnalyzer = TraceAnalyzer()
+        self.counter = 0
 
     def loadContract(self, source, name):
-        self.contract = evm.compile(source, name)
-        # self.contractAddress = evm.deploy(self.contract)
+        self.contract = self.evm.compile(source, name)
+        # self.contractAddress = self.evm.deploy(self.contract)
         self.contractAbi = ContractAbi(self.contract)
 
     def runOneTx(self, tx):
         if self.contract == None:
             logging.error("Contract have not been loaded.")
             return None
-        trace = evm.sendTx(tx.sender, self.contractAddress,
+        trace = self.evm.sendTx(tx.sender, self.contractAddress,
                            tx.value, tx.payload)
         return trace
 
     def runTxs(self, txList):
         traces = []
         for tx in txList:
-            trace.append(self.runOneTx(tx))
+            traces.append(self.runOneTx(tx))
         return traces
 
     def reward(self, traces):
-        return 0, []
+        self.counter += 1
+        reports = []
+        reward = 0
+        # for trace in traces:
+        #     reports.append(self.traceAnalyzer.run(trace))
+        accounts_p = self.accounts
+        self.accounts = self.evm.getAccounts()
+        # balance increase
+        bal_p = 0
+        bal = 0
+        for acc in self.accounts.keys():
+            bal_p += int(accounts_p[acc], 16)
+            bal += int(self.accounts[acc], 16)
+        if bal > bal_p:
+            reward += 1
+            reports.append(1)
+        return reward, reports
 
     def mutate(self, state, action):
         txList = state.txList + []
@@ -95,7 +115,7 @@ class Fuzzer():
                 sender = state.txList[actionArg].sender
                 attempt = 100
                 while sender == state.txList[actionArg].sender and attempt > 0:
-                    randIndex = randint(0, len(self.accounts.keys())-1)
+                    randIndex = randint(1, len(self.accounts.keys())-1)
                     sender = list(self.accounts.keys())[randIndex]
                     attempt -= 1
                 txList[actionArg].sender = sender
@@ -115,28 +135,36 @@ class Fuzzer():
         return State(state.staticAnalysis, txList)
 
     def reset(self):
+        self.counter = 0
         if not self.contract:
             logging.error("Contract not inintialized in fuzzer.")
             return
-        self.contractAddress = evm.deploy(self.contract)
+        self.contractAddress = self.evm.deploy(self.contract)
         # todo
         self.state = State(None, [])
         self.traces = []
         self.reports = []
         # randomFuncIndex = randint(0, len(self.contractAbi.funcHashList)-1)
         # self.state = self.mutate(self.state, actionProcessor.encode(0, randomFuncIndex))
-        return self.stateProcessor.encode(self.state)
+        state, seqLen = self.stateProcessor.encodeState(self.state)
+        return state, seqLen
 
     def step(self, action):
-        action = self.actionProcessor.decode(action)
-        nextState = self.mutate(state, action)
+        done = 0
+        action = self.actionProcessor.decodeAction(action)
+        nextState = self.mutate(self.state, action)
         if not nextState:
-            return self.state, 0, 0
+            state, seqLen = self.stateProcessor.encodeState(self.state)
+            return state, seqLen, 0, done
         traces = self.runTxs(nextState.txList)
         reward, report = self.reward(traces)
+        # test
+        if self.counter >= 100 or len(report) > 0:
+            done = 1
         # update
         self.state = nextState
         self.traces = traces
         # should exclude repeated reports: todo
         self.reports += report
-        return self.stateProcessor.encode(self.state), reward
+        state, seqLen = self.stateProcessor.encodeState(self.state)
+        return state, seqLen, reward, done

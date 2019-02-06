@@ -14,12 +14,14 @@ let contract = evm.compile(source, name);
 // console.log(contract)
 evm.deploy(contract).then((result) => {
   console.log("contract deployed:", result.tx.contractAddress);
-  return evm.sendFormatTx(accs[1], result.tx.contractAddress, 0, "test", [])
+  return evm.sendFormatTx(accs[1], result.tx.contractAddress, 0, "test1", ["0xffff"])
 }).then((result) => {
   console.log("transaction accepted:", result.tx.hash);
+  // console.log(result.tx, result.res)
   return evm.debug(result.tx);
 }).then((trace) => {
   console.log("trace length:", trace.length);
+  // console.log(trace)
 }).catch((err) => {
   console.log(err)
 })

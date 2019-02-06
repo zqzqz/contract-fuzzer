@@ -2,7 +2,8 @@ import logging
 import itertools
 import numpy as np
 import tensorflow as tf
-from utils import hexToUint8
+from utils import hexToUint8, removeHexPrefix
+import os
 
 actionList = ["insertFirst", "insertLast", "removeFirst",
               "removeLast", "modifyArgs", "modifySender", "modifyValue"]
@@ -22,7 +23,7 @@ class ActionProcessor:
     def __init__(self, maxFuncNum, maxCallNum):
         self.maxFuncNum = maxFuncNum
         self.maxCallNum = maxCallNum
-        self.actionNum = maxFuncNum * 4 + maxCallNum * 2
+        self.actionNum = maxFuncNum * 2 + maxCallNum * 3 + 2
 
     def encodeAction(self, actionObj):
         actionId = actionObj.actionId
@@ -41,7 +42,7 @@ class ActionProcessor:
 
     def decodeAction(self, action):
         assert(action >= 0 and action <
-               self.maxFuncNum * 2 + self.maxCallNum * 2)
+               self.maxFuncNum * 2 + self.maxCallNum * 3 + 2)
         if action < 2 * self.maxFuncNum:
             return Action(action // self.maxFuncNum, action % self.maxFuncNum)
         elif action < 2 * self.maxFuncNum + 2:
@@ -62,40 +63,48 @@ class StateProcessor:
         map states to tensors
     """
 
-    def __init__(self, maxFuncNum, maxCallNum, tokenSize=256):
+    def __init__(self, maxFuncNum, maxCallNum, tokenSize=256, max_seq_len=256):
         self.maxFuncNum = maxFuncNum
         self.maxCallNum = maxCallNum
         self.tokenSize = tokenSize
+        self.max_seq_len = max_seq_len
+        self.sequence = None
+        self.seqLen = None
 
     def encodeState(self, stateObj):
         staticAnalysis = stateObj.staticAnalysis
         txList = stateObj.txList
         # encoding of staticAnalysis: todo
-        sequence = np.array([[0 for _ in range(self.tokenSize)]], dtype=np.uint8)
+        self.sequence = np.array([[0 for _ in range(self.tokenSize)]], dtype=np.uint8)
         for tx in txList:
-            sequence = np.append(sequence, np.expand_dims(hexToUint8(tx.hash, self.tokenSize), axis=0), axis=0)
+            self.processHexToken(tx.hash)
             for arg in tx.args:
-                sequence = np.append(sequence, np.expand_dims(hexToUint8(arg, self.tokenSize), axis=0), axis=0)
-            sequence = np.append(sequence, np.expand_dims(hexToUint8(tx.value, self.tokenSize), axis=0), axis=0)
-            sequence = np.append(sequence, np.expand_dims(hexToUint8(tx.sender, self.tokenSize), axis=0), axis=0)
-        return sequence[1:]
+                self.processHexToken(arg)
+            self.processHexToken(tx.value)
+            self.processHexToken(tx.sender)
+        self.seqLen = self.sequence.shape[0]
+        while self.sequence.shape[0] < self.max_seq_len:
+            self.processHexToken("0x00")
+        return self.sequence, self.seqLen
 
     def decodeState(self, state):
         pass
 
+    def processHexToken(self, token):
+        self.sequence = np.append(self.sequence, np.expand_dims(hexToUint8(token, self.tokenSize), axis=0), axis=0)
 
 class Estimator():
     """
         Q-value estimator neural network
     """
 
-    def __init__(self, scope="estimator", summaries_dir=None):
+    def __init__(self, scope="estimator", summaries_dir=None, action_num=17, max_seq_len=256, lstm_size=128, token_size=256):
         self.scope = scope
         # Writes Tensorboard summaries to disk
         self.summary_writer = None
         with tf.variable_scope(scope):
             # Build the graph
-            self._build_model(256, len(actionList), 128)
+            self._build_model(max_seq_len, action_num, lstm_size, token_size)
             if summaries_dir:
                 summary_dir = os.path.join(
                     summaries_dir, "summaries_{}".format(scope))
@@ -109,7 +118,7 @@ class Estimator():
             shape=[None, sequence_length, token_size], dtype=tf.uint8, name="X")
         # The TD target value
         self.y = tf.placeholder(
-            shape=[None, action_num], dtype=tf.float32, name="y")
+            shape=[None], dtype=tf.float32, name="y")
         # Integer id of which action was selected
         self.actions = tf.placeholder(
             shape=[None], dtype=tf.int32, name="actions")
@@ -117,13 +126,16 @@ class Estimator():
         self.real_seq_length = tf.placeholder(
             tf.float32, [None], name='real_seq_length')
 
+        X_f = tf.to_float(self.X)
+        batch_size = tf.shape(self.X)[0]
+
         # RNN
         with tf.name_scope('RNN'):
             self.cell = tf.nn.rnn_cell.LSTMCell(lstm_size)
             self.cell = tf.contrib.rnn.DropoutWrapper(
                 self.cell, output_keep_prob=0.5)
-            self.outputs, self.status = tf.nn.dynamic_rnn(
-                self.cell, self.X, sequence_length=self.real_seq_length, dtype=tf.float32)
+            self.outputs, self.states = tf.nn.dynamic_rnn(
+                self.cell, X_f, sequence_length=self.real_seq_length, dtype=tf.float32)
 
         # linear transformation
         with tf.name_scope("linear"):
@@ -132,16 +144,20 @@ class Estimator():
             output_bias = tf.Variable(initial_value=tf.constant(
                 [0.1] * action_num), name='output_bias')
             self.predictions = tf.nn.xw_plus_b(
-                self.status[-1], output_wrapper, output_bias, name='predictions')
-            self.outputs = tf.argmax(self.predictions, axis=1, name='outputs')
+                self.states[-1], output_wrapper, output_bias, name='predictions')
+            # self.outputs = tf.argmax(self.predictions, axis=1, name='outputs')
+            # Get the predictions for the chosen actions only
+            gather_indices = tf.range(batch_size) * tf.shape(self.predictions)[1] + self.actions
+            self.outputs = tf.gather(tf.reshape(self.predictions, [-1]), gather_indices)
 
         # loss and accuracy
         with tf.name_scope('loss_accuracy'):
-            self.losses = tf.nn.softmax_cross_entropy_with_logits(
-                logits=self.predictions, labels=self.y)
-            self.loss = tf.reduce_mean(losses)
+            # self.losses = tf.nn.softmax_cross_entropy_with_logits(
+            #    logits=self.outputs, labels=self.y)
+            self.losses = tf.squared_difference(self.y, self.outputs)
+            self.loss = tf.reduce_mean(self.losses)
             self.accuracy = tf.reduce_mean(
-                tf.cast(tf.equal(self.outputs, tf.argmax(self.y, axis=1)), "float"))
+                tf.cast(tf.equal(self.outputs, self.y), "float"))
 
         self.optimizer = tf.train.AdamOptimizer(0.001)
         self.train_op = self.optimizer.minimize(
@@ -222,9 +238,9 @@ def make_epsilon_greedy_policy(estimator, nA):
         the probabilities for each action in the form of a numpy array of length nA.
 
     """
-    def policy_fn(sess, observation, epsilon):
+    def policy_fn(sess, observation, epsilon, seq_len):
         A = np.ones(nA, dtype=float) * epsilon / nA
-        q_values = estimator.predict(sess, np.expand_dims(observation, 0))[0]
+        q_values = estimator.predict(sess, np.expand_dims(observation, 0), np.expand_dims(seq_len, 0))[0]
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
         return A

@@ -1,6 +1,6 @@
 import json
 import logging
-import types
+from evm_types import generateValueByType
 
 
 class Transaction:
@@ -67,7 +67,7 @@ class ContractAbi:
     def generateTxValue(self, hash):
         assert(self.interface[hash] != None)
         inputAbi = self.interface[hash]["inputs"]
-        value = 0
+        value = "0x"
         if self.interface[hash]['payable']:
             value = generateValueByType("payment", "random")
         return value

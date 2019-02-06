@@ -48,7 +48,7 @@ class EvmHandler():
         return ret
 
     def sendTx(self, fromAddr, toAddr, value, data):
-        sendTxData = evm_pb2.sendTxData(fromAddr=fromAddr, toAddr=toAddr, value=value, data=data)
+        sendTxData = evm_pb2.SendTxData(fromAddr=fromAddr, toAddr=toAddr, value=value, data=data)
         ret = None
         for i in self.stub.SendTx(sendTxData):
             ret = i.data

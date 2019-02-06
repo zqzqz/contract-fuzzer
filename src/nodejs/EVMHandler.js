@@ -66,7 +66,7 @@ EVMHandler = {
     EVMHandler.accounts = [];
     for (let i in privateKeys) {
       let address = utileth.privateToAddress(privateKeys[i])
-      vm.stateManager.putAccountBalance(address, 'f00000000000000001', function cb () {})
+      vm.stateManager.putAccountBalance(address, '0xffffffffffffffffffffffff', function cb () {})
       EVMHandler.accounts[utileth.bufferToHex(address)] = privateKeys[i].toString('hex');
       if (i == 0) {
         EVMHandler.defaultAccount = utileth.bufferToHex(address);
@@ -144,6 +144,7 @@ EVMHandler = {
   // send a raw transaction
   sendTx: (from, to, value, data) => {
     return new Promise((resolve, reject) => {
+      data = data.replace("0x", "")
       let tx = new Tx({
         nonce: new BN(from.nonce++),
         gasPrice: new BN(1),

@@ -67,7 +67,7 @@ async function deployWrapper(call) {
 
 async function sendTxWrapper(call) {
   try {
-    let res = await evmHandler.sendTx(sendTxData.fromAddr, sendTxData.toAddr, sendTxData.value, sendTxData.data);
+    let res = await evmHandler.sendTx(call.request.fromAddr, call.request.toAddr, call.request.value, call.request.data);
     let trace = await evmHandler.debug(res.tx);
     call.write({
       data: JSON.stringify(trace)

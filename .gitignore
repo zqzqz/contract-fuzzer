@@ -6,3 +6,4 @@ include
 lib
 __pycache__
 pip-selfcheck.json
+/src/python/experiments
