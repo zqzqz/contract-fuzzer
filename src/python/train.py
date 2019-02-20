@@ -204,7 +204,7 @@ def deep_q_learning(sess,
         #     episode_lengths=stats.episode_lengths[:i_episode+1],
         #     episode_rewards=stats.episode_rewards[:i_episode+1])
 
-    return stats
+    return
 
 
 def train():
@@ -236,8 +236,8 @@ def train():
                                         target_estimator=target_estimator,
                                         experiment_dir=experiment_dir,
                                         num_episodes=100,
-                                        replay_memory_size=5000,
-                                        replay_memory_init_size=500,
+                                        replay_memory_size=1000,
+                                        replay_memory_init_size=100,
                                         update_target_estimator_every=100,
                                         epsilon_start=1.0,
                                         epsilon_end=0.1,

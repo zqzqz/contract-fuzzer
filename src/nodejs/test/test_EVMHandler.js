@@ -21,6 +21,7 @@ evm.deploy(contract).then((result) => {
   return evm.debug(result.tx);
 }).then((trace) => {
   console.log("trace length:", trace.length);
+  fs.writeFileSync("testTrace.json", JSON.stringify(trace, null, 2));
   // console.log(trace)
 }).catch((err) => {
   console.log(err)

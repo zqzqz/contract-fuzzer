@@ -7,6 +7,12 @@ from random import randint
 from model import *
 from trace import *
 
+# for testing
+def printTxList(txList):
+    print("txList:")
+    for tx in txList:
+        print(tx.payload)
+
 
 class ArgsPool():
     def __init__(self):
@@ -57,10 +63,7 @@ class Fuzzer():
 
     def reward(self, traces):
         self.counter += 1
-        reports = []
-        reward = 0
-        # for trace in traces:
-        #     reports.append(self.traceAnalyzer.run(trace))
+        report, reward = self.traceAnalyzer.run(self.traces, traces)
         accounts_p = self.accounts
         self.accounts = self.evm.getAccounts()
         # balance increase
@@ -71,8 +74,9 @@ class Fuzzer():
             bal += int(self.accounts[acc], 16)
         if bal > bal_p:
             reward += 1
-            reports.append(1)
-        return reward, reports
+            report.append("balanceIncrease")
+        self.traces = traces
+        return reward, report
 
     def mutate(self, state, action):
         txList = state.txList + []
@@ -81,6 +85,8 @@ class Fuzzer():
         if actionId >= 0 and actionId < 2:
             # insert
             if actionArg < 0 or actionArg >= len(self.contractAbi.funcHashList):
+                return None
+            if len(txList) >= self.maxCallNum:
                 return None
             tx = self.contractAbi.generateTx(
                 self.contractAbi.funcHashList[actionArg], self.defaultAccount)
@@ -156,6 +162,7 @@ class Fuzzer():
         if not nextState:
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, 0, done
+        # printTxList(nextState.txList)
         traces = self.runTxs(nextState.txList)
         reward, report = self.reward(traces)
         # test
@@ -165,6 +172,6 @@ class Fuzzer():
         self.state = nextState
         self.traces = traces
         # should exclude repeated reports: todo
-        self.reports += report
+        self.reports = list(set(self.reports + report))
         state, seqLen = self.stateProcessor.encodeState(self.state)
         return state, seqLen, reward, done
