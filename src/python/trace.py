@@ -2,6 +2,7 @@ import logging
 
 # todo
 
+
 class TraceAnalyzer:
     def __init__(self):
         pass
@@ -13,9 +14,10 @@ class TraceAnalyzer:
         return
           report (list(string)): found vulnerabilities
           reward (int): calculated reward
-    """ 
+    """
+
     def run(self, ptraces, ctraces):
-        pJumps =[]
+        pJumps = []
         cJumps = []
         for ptrace in ptraces:
             for state in ptrace:
@@ -25,7 +27,14 @@ class TraceAnalyzer:
             for state in ctrace:
                 if state["op"][:4] == "JUMP":
                     cJumps.append(state["pc"])
+        pJumps = list(set(pJumps))
+        cJumps = list(set(cJumps))
         difJumps = list(set(pJumps + cJumps))
-        comJumpNum = len(pJumps) + len(cJumps) - len(difJumps)
-        reward = (len(difJumps) - comJumpNum) / len(difJumps)
+        # print(difJumps, pJumps, cJumps)
+        if len(difJumps) == 0:
+            reward = 0
+        else:
+            comJumpNum = len(pJumps) + len(cJumps) - len(difJumps)
+            reward = (len(pJumps) + len(cJumps) -
+                      2 * comJumpNum) / len(difJumps)
         return [], reward

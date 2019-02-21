@@ -8,10 +8,13 @@ from model import *
 from trace import *
 
 # for testing
+
+
 def printTxList(txList):
     print("txList:")
-    for tx in txList:
-        print(tx.payload)
+    for i in range(len(txList)):
+        print("[{}] payload: {}, sender: {}, value: {}".format(
+            str(i), txList[i].payload, txList[i].sender, txList[i].value))
 
 
 class ArgsPool():
@@ -52,7 +55,7 @@ class Fuzzer():
             logging.error("Contract have not been loaded.")
             return None
         trace = self.evm.sendTx(tx.sender, self.contractAddress,
-                           tx.value, tx.payload)
+                                tx.value, tx.payload)
         return trace
 
     def runTxs(self, txList):
@@ -64,14 +67,16 @@ class Fuzzer():
     def reward(self, traces):
         self.counter += 1
         report, reward = self.traceAnalyzer.run(self.traces, traces)
-        accounts_p = self.accounts
+
+        self.accounts_p = self.accounts
         self.accounts = self.evm.getAccounts()
         # balance increase
         bal_p = 0
         bal = 0
         for acc in self.accounts.keys():
-            bal_p += int(accounts_p[acc], 16)
+            bal_p += int(self.accounts_p[acc], 16)
             bal += int(self.accounts[acc], 16)
+
         if bal > bal_p:
             reward += 1
             report.append("balanceIncrease")
@@ -123,6 +128,7 @@ class Fuzzer():
                 while sender == state.txList[actionArg].sender and attempt > 0:
                     randIndex = randint(1, len(self.accounts.keys())-1)
                     sender = list(self.accounts.keys())[randIndex]
+                    sender = self.defaultAccount
                     attempt -= 1
                 txList[actionArg].sender = sender
             else:
@@ -162,10 +168,14 @@ class Fuzzer():
         if not nextState:
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, 0, done
-        # printTxList(nextState.txList)
+        # testing
+        printTxList(nextState.txList)
+        #
         traces = self.runTxs(nextState.txList)
         reward, report = self.reward(traces)
-        # test
+        # testing
+        # print(reward, report)
+        # testing
         if self.counter >= 100 or len(report) > 0:
             done = 1
         # update

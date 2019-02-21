@@ -11,7 +11,7 @@ typeList = {
 
     "payment": {
         "type": "number",
-        "size": 64
+        "size": 256
     },
 
     "address": {
@@ -56,11 +56,11 @@ def generateValueByType(_type, mode="random"):
     # which type
     if typeObj["type"] == "number":
         if mode == "min":
-            return generateAllZeroValue(typeObj["size"])
+            return generateAllZeroValue(typeObj["size"] // 4)
         elif mode == "max":
-            return generateAllOneValue(typeObj["size"])
+            return generateAllOneValue(typeObj["size"] // 4)
         elif mode == "random":
-            return generateRandomValue(typeObj["size"])
+            return generateRandomValue(typeObj["size"] // 4)
         else:
             logging.error("Incorrect mode for generateValueByType.")
             return None
