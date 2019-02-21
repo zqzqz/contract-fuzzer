@@ -2,6 +2,64 @@
 import os
 import re
 
+# keywords type
+'''
+1. Topic Keywords (TopKey)
+    1) 1st level: Contract <== contract
+    2) 2nd level: Function <== fun
+    3) 3rd level: 
+        a) Expression 
+        b) IRs
+   
+2. Syntax Keywords (SynKey)
+   refer to slither Doc
+   https://github.com/trailofbits/slither/wiki/SlithIR
+
+3. name of variable
+    1) TMP_[1..9]* <== TMP_ID
+    2) REF_[1..9]* <== REF_ID
+    3) Others <== Var_ID
+
+4. Operator: 
+    :=,!=, +,-,*,/, **, ->, &,|,^,<,>, &&, --
+    1) assignment: :=
+    2) binary oper: **,+,-,*,/,<<,>>,&,^,|,>,<,>=,<=,==,!=,,&&,--
+    3) unary oper: !,~
+    4) index: LVALUE [ RVALUE ]
+    5) member:
+        a)REFERENCE -> LVALUE . RVALUE
+        b)REFERENCE -> CONTRACT . RVALUE
+        c)REFERENCE -> ENUM . RVALUE
+    6) new oper
+    7) push oper
+    8) delete oper
+    9）conversion
+    CONVERT LVALUE RVALUE TYPE
+    10) unpack
+    11) array initialization
+    12) call oper
+    13) return
+    14) condition
+5. variable type (varType)
+    ([address/unint256...],[][])
+    
+6. system variable (sysVar0
+    1) msg
+        a) .sender
+        b) .value
+    2) this
+        a) .balance    
+
+6. delimiters (Separator)
+    
+'''
+
+# output format
+'''
+token.results=[result0,result1,...]
+result = [lineno,(type,word)]
+'''
+
 class Token(object):
 
     # initialization
@@ -13,27 +71,25 @@ class Token(object):
         this.lineno = 1
 
         # basic keywords
-        # this.keywords = ['Contract','Function','Expression','IRs','condition','_receiver','balance']
-        this.keywords = ['auto', 'struct', 'if', 'else', 'for', 'do', 'while', 'const',
-                         'int', 'double', 'float', 'long', 'char', 'short', 'unsigned',
-                         'switch', 'break', 'defalut', 'continue', 'return', 'void', 'static',
-                         'auto', 'enum', 'register', 'typeof', 'volatile', 'union', 'extern']
-        '''
-    regex中：*表示从0-， +表示1-， ？表示0-1。对应的需要转义
-    { 表示限定符表达式开始的地方 \{
-    () 标记一个子表达式的开始和结束位置。子表达式可以获取共以后使用：\( \)
-    r表示原生字符串。
-    '''
+        this.keywords = ['Contract','Function','Expression:','IRs:']
+
         # Keywords
-        Keyword = r'(?P<Keyword>(auto){1}|(double){1}|(int){1}|(if){1}|(#include){1}|(return){1}|(char){1}|(stdio\.h){1}|(const){1})'
-        # operations := + - * ** /
-        Operator = r'(?P<Operator>\+\+|\+=|\+|--|-=|-|\*=|/=|/|%=|%)'
+        Keyword = r'(?P<Keyword>(Contract){1}|(Function){1}|(Expression:){1}|(IRs:){1})'
+
+        # operations
+        Operator = r'(?P<Operator>\+=|\+|--|-=|-|\*=|:=|/)'
 
         # delimiters (not neccessary for IR)
-        Separator = r'(?P<Separator>[,:\{}:)(<>])'
+        Separator = r'(?P<Separator>[)(,\[\]])'
 
         # numbers
         Number = r'(?P<Number>\d+[.]?\d+)'
+
+        # variable type
+        varType = r'(?P<varType>address|uint256)'
+
+        # system variable
+        sysVar = r'(?P<sysVar>msg.sender|msg.value|this.balance)'
 
         # name of variable
         ID = r'(?P<ID>[a-zA-Z_][a-zA-Z_0-9]*)'
@@ -44,7 +100,7 @@ class Token(object):
         # Error = r'(?P<Error>.*\S+)'
         Error = r'\"(?P<Error>.*)\"'
 
-        this.patterns = re.compile('|'.join([Keyword, Method, ID, Number, Separator, Operator, Error]))
+        this.patterns = re.compile('|'.join([Keyword, Method, varType, sysVar, ID, Number, Separator, Operator, Error]))
 
     # read the file, return the list of lines
     def read_file(this, filename):
@@ -64,29 +120,39 @@ class Token(object):
         for match in re.finditer(this.patterns, line):
             yield (match.lastgroup, match.group())
 
-    def run(this, line, flag=True):
+    def run(this, line):
+        result = []
         for token in this.get_token(line):
-            if flag:
-                print("line %3d :" % this.lineno, token)
-            else:
-                yield "line %3d :" % this.lineno + str(token) + "\n"
-
-
-    def printrun(this, line, flag=True):
-        for token in this.get_token(line):
-            if flag:
-                print("lines x: ", token)
-
+            result.append(this.lineno)
+            result.append(token)
+            this.results.append(result)
+            result=[]
+            yield "line %3d :" % this.lineno + str(token) + "\n"
 
 if __name__ == '__main__':
     token = Token()
-    filepath = "test.c"
+    filepath = "outIR.txt"
 
     lines = token.read_file(filepath)
     print(lines)
 
     for line in lines:
-        # token.run(line, True)
-        token.write_file(token.run(line, False), "results.txt")
+        token.write_file(token.run(line), "results.txt")
         token.lineno += 1
 
+    print(token.results)
+
+
+'''
+Next goal:
+Function withdraw()
+	Expression: require(bool)(msg.sender.call.value(balances[msg.sender])())
+	IRs:
+		REF_4(uint256) -> balances[msg.sender]
+		TMP_3(bool) = LOW_LEVEL_CALL, dest:msg.sender, function:call, arguments:[] value:REF_4 
+		TMP_5 = SOLIDITY_CALL require(bool)(TMP_3)
+	Expression: balances[msg.sender] = 0
+	IRs:
+		REF_5(uint256) -> balances[msg.sender]
+		REF_5 (->balances) := 0(uint256)
+'''
