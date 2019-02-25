@@ -163,8 +163,7 @@ class Token(object):
 
 if __name__ == '__main__':
     token = Token()
-    # filepath = "outIR.txt"
-    filepath = "testIR.txt"
+    filepath = "outIR.txt"
 
     lines = token.read_file(filepath)
     # print(lines)
