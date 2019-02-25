@@ -66,6 +66,9 @@ class Token(object):
     def __init__(this):
         # list for the result of token
         this.results = []
+	
+	# results after deeper analysis
+	this.final = []
 
         # line number
         this.lineno = 1
@@ -128,6 +131,20 @@ class Token(object):
             this.results.append(result)
             result=[]
             yield "line %3d :" % this.lineno + str(token) + "\n"
+    
+    # deal with the 'results' list to simplify
+    def transform(this):
+        # filter for dropping expression and keep irs
+        dropLineno = []
+        changeLineno = 0
+        for token in this.results:
+            if (token[1][1] == 'Expression:'):
+                dropLineno.append(token[0])
+                changeLineno += 1
+            if not(token[0] in dropLineno):
+                token[0] -= changeLineno
+                this.final.append(token)
+        print(dropLineno)
 
 if __name__ == '__main__':
     token = Token()
@@ -140,7 +157,10 @@ if __name__ == '__main__':
         token.write_file(token.run(line), "results.txt")
         token.lineno += 1
 
+    # for test and debug
     print(token.results)
+    token.transform()
+    print(token.final)
 
 
 '''
