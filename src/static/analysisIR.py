@@ -4,8 +4,8 @@ import re
 # keywords type
 '''
 1. Topic Keywords (TopKey)
-    1) 1st level: Contract <== contract
-    2) 2nd level: Function <== fun
+    1) 1st level: Contract <== contract and conID
+    2) 2nd level: Function <== fun and funID
     3) 3rd level: 
         a) Expression 
         b) IRs
@@ -17,7 +17,7 @@ import re
 3. name of variable
     1) TMP_[1..9]* <== TMP_ID
     2) REF_[1..9]* <== REF_ID
-    3) Others <== Var_ID
+    3) Others <== ID
 
 4. Operator: 
     :=,!=, +,-,*,/, **, ->, &,|,^,<,>, &&, --
@@ -59,15 +59,18 @@ token.results=[result0,result1,...]
 result = [lineno,(type,word)]
 '''
 
+
 class Token(object):
 
     # initialization
     def __init__(this):
         # list for the result of token
         this.results = []
-	
-	# results after deeper analysis
-	this.final = []
+        this.final = []
+
+        # list for read and write
+        this.readList = []
+        this.writeList = []
 
         # line number
         this.lineno = 1
@@ -130,40 +133,114 @@ class Token(object):
             this.results.append(result)
             result=[]
             yield "line %3d :" % this.lineno + str(token) + "\n"
-    
-    # deal with the 'results' list to simplify
+
     def transform(this):
-        # filter for dropping expression and keep irs
+        '''
+        filter for dropping expression and keep irs;
+        transform tuple into list
+        distinguish different types of ID;
+        '''
         dropLineno = []
         changeLineno = 0
-        for token in this.results:
-            if (token[1][1] == 'Expression:'):
-                dropLineno.append(token[0])
+        lst = iter(range(len(this.results)))
+        for i in lst:
+            if (this.results[i][1][1] == 'Expression:'):
+                dropLineno.append(this.results[i][0])
                 changeLineno += 1
-            if not(token[0] in dropLineno):
-                token[0] -= changeLineno
-                this.final.append(token)
-        print(dropLineno)
+            if not(this.results[i][0] in dropLineno):
+                this.results[i][0] -= changeLineno
+                if (this.results[i][1][1] == 'Contract'):
+                    this.final.append([this.results[i][0], [this.results[i][1][0], this.results[i][1][1]]])
+                    this.final.append([this.results[i+1][0],['conID',this.results[i+1][1][1]]])
+                    lst.__next__()
+                elif (this.results[i][1][1] == 'Function'):
+                    this.final.append([this.results[i][0], [this.results[i][1][0], this.results[i][1][1]]])
+                    this.final.append([this.results[i+1][0], ['funID', this.results[i+1][1][1]]])
+                    lst.__next__()
+                else:
+                    this.final.append([this.results[i][0], [this.results[i][1][0], this.results[i][1][1]]])
+
+        # print(this.final)
+
+        '''
+        combine with ID and its type;
+        drop the '(' and ')' for variable type
+        '''
+        dropToken = []
+        for i in range(len(this.final)):
+            if (this.final[i][1][0] in ['ID','sysVar']):
+                type = this.final[i+2][1][1]
+                this.final[i].append(type)
+                dropToken.extend([i+1,i+2,i+3])
+        for i in range(len(dropToken)):
+            del this.final[dropToken[i]]
+            for j in range(len(dropToken)):
+                dropToken[j]-=1
+
+        # print(this.final)
+
+        '''
+        deal with ':='
+        '''
+        eqNum = []
+        for i in range(len(this.final)):
+            if (this.final[i][1][1] == ':='):
+                eqNum.append(i)
+        # In the same line, the ID on the left side of ':=' means write, the ID on the right side means read
+        # I am not sure whether this way is right
+        for i in eqNum:
+            j = i
+            lineNum = this.final[i][0]
+            while (True):
+                j -= 1
+                if (this.final[j][1][0] in ['ID','sysVar']) :
+                    this.readList.append(this.final[j])
+                if (this.final[j]!=lineNum): break
+            j = i
+            while (True):
+                j += 1
+                if (this.final[j][1][0] in ['ID','sysVar']):
+                    this.writeList.append(this.final[j])
+                if (this.final[j]!=lineNum): break
+
+        print('total tokens:\n',this.final)
+        print('read:\n',this.readList)
+        print('write:\n',this.writeList)
+
+        '''
+        drop all the operators
+        '''
+        dropOper = []
+        for i in range(len(this.final)):
+            if (this.final[i][1][0] == 'Operator'):
+                dropOper.append(i)
+        for i in range(len(dropOper)):
+            del this.final[dropOper[i]]
+            for j in range(len(dropOper)):
+                dropOper[j] -= 1
 
 if __name__ == '__main__':
     token = Token()
-    filepath = "outIR.txt"
+    # filepath = "outIR.txt"
+    filepath = "testIR.txt"
 
     lines = token.read_file(filepath)
-    print(lines)
+    # print(lines)
 
     for line in lines:
         token.write_file(token.run(line), "results.txt")
         token.lineno += 1
 
-    # for test and debug
-    print(token.results)
+    # print(token.results)
     token.transform()
-    print(token.final)
-
+    print('simplified token:\n', token.final)
 
 '''
 Next goal:
+
+（1）take [] into consideration
+
+（2）function <--> function
 Function withdraw()
 	Expression: require(bool)(msg.sender.call.value(balances[msg.sender])())
 	IRs:
