@@ -14,5 +14,3 @@ for i in range(len(conArr)):
     conPath.append(os.path.join(os.path.abspath('./contracts'),conArr[i]))
     irArr.append(subprocess.check_output(["slither",conPath[i],"--print","slithir"]))
     f.write(irArr[i])
-
-print("conList is:/n",conArr)
