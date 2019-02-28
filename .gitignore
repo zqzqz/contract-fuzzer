@@ -4,6 +4,8 @@ package-lock.json
 bin
 include
 lib
+share
+pyvenv.cfg
 __pycache__
 pip-selfcheck.json
 /src/python/experiments
