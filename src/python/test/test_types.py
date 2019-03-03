@@ -1,6 +1,10 @@
 import sys
 sys.path.append("..")
-from types import *
+from evm_types import *
 
 if __name__ == '__main__':
-    print(generateValueByType("uint256", "random"))
+    typeHandler = TypeHandler()
+    print(typeHandler.generateValueByType("uint256", "min"))
+    print(typeHandler.generateValueByType("uint256", "max"))
+    print(typeHandler.generateValueByType("uint256", "random"))
+    print(typeHandler.generateValueByType("uint256", "seed"))

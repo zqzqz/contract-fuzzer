@@ -6,7 +6,7 @@ def test():
     import evm
     import os
     contract = None
-    with open(os.path.join(os.getcwd(), '../../static/testContract.json'), 'r') as f:
+    with open(os.path.join(os.path.dirname(__file__), '../../static/test/testContract.json'), 'r') as f:
         contract = json.load(f)
     abi = ContractAbi(contract)
     print(abi.interface)

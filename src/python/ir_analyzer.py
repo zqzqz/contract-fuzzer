@@ -25,13 +25,15 @@ class Visitor():
             self.ir = default_visitor
 
 class IrAnalyzer():
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, contract_name=None):
         self.slither = None
-        if filename:
+        self.contract_name = None
+        if filename and contract_name:
             self.load_contract(filename)
 
-    def load_contract(self, filename):
+    def load_contract(self, filename, contract_name):
         self.slither = Slither(filename)
+        self.contract_name = contract_name
 
     def parse_contracts(self, visitor):
         for contract in self.contracts:
@@ -61,3 +63,11 @@ class IrAnalyzer():
     def contracts(self):
         assert(self.slither != None)
         return self.slither._contracts_by_id.values()
+
+    @property
+    def contract(self):
+        assert(self.slither != None)
+        for contract in self.contracts:
+            if contract.name == self.contract_name:
+                return contract
+        return None

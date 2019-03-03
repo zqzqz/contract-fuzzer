@@ -1,6 +1,6 @@
 import json
 import logging
-from evm_types import generateValueByType
+from evm_types import TypeHandler
 
 
 class Transaction:
@@ -24,6 +24,7 @@ class ContractAbi:
     def __init__(self, contract=None):
         self.interface = {}
         self.funcHashList = []
+        self.typeHandler = TypeHandler()
         if contract != None:
             self.loadAbi(contract)
 
@@ -60,7 +61,7 @@ class ContractAbi:
         args = []
         inputAbi = self.interface[hash]["inputs"]
         for abi in inputAbi:
-            data = generateValueByType(abi["type"], "random")
+            data = self.typeHandler.generateValueByType(abi["type"], "random")
             args.append(data)
         return args
 
@@ -69,7 +70,7 @@ class ContractAbi:
         inputAbi = self.interface[hash]["inputs"]
         value = "0x"
         if self.interface[hash]['payable']:
-            value = generateValueByType("payment", "random")
+            value = self.typeHandler.generateValueByType("payment", "random")
         return value
 
     """

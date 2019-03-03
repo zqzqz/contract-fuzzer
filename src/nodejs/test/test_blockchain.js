@@ -1,3 +1,5 @@
+// depracated !!
+
 const fs = require('fs');
 let blockchain = require("../blockchain");
 

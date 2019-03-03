@@ -3,28 +3,14 @@ from interface import ContractAbi, Transaction
 import types
 import logging
 from random import randint
+import json
 
 from model import *
 from trace import *
 
-# for testing
-
-
-def printTxList(txList):
-    print("txList:")
-    for i in range(len(txList)):
-        print("[{}] payload: {}, sender: {}, value: {}".format(
-            str(i), txList[i].payload, txList[i].sender, txList[i].value))
-
-
-class ArgsPool():
-    def __init__(self):
-        pass
-
 
 class Fuzzer():
     def __init__(self, maxFuncNum=3, maxCallNum=3, evmEndPoint=None):
-        self.argsPool = ArgsPool()
         if evmEndPoint:
             self.evm = EvmHandler(evmEndPoint)
         else:
@@ -42,6 +28,8 @@ class Fuzzer():
         self.reports = []
         self.accounts = self.evm.getAccounts()
         self.defaultAccount = list(self.accounts.keys())[1]
+        with open(os.path.join(os.path.dirname(__file__), '../static/seed/address.json'), 'w') as f:
+            json.dump(list(self.accounts.keys()), f, indent="\t")
         self.traceAnalyzer = TraceAnalyzer()
         self.counter = 0
 
@@ -169,8 +157,7 @@ class Fuzzer():
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, 0, done
         # testing
-        printTxList(nextState.txList)
-        #
+        # self.printTxList(nextState.txList)
         traces = self.runTxs(nextState.txList)
         reward, report = self.reward(traces)
         # testing
@@ -181,7 +168,14 @@ class Fuzzer():
         # update
         self.state = nextState
         self.traces = traces
-        # should exclude repeated reports: todo
+        # should exclude repeated reports
         self.reports = list(set(self.reports + report))
         state, seqLen = self.stateProcessor.encodeState(self.state)
         return state, seqLen, reward, done
+
+    @staticmethod
+    def printTxList(txList):
+        print("txList:")
+        for i in range(len(txList)):
+            print("[{}] payload: {}, sender: {}, value: {}".format(
+                str(i), txList[i].payload, txList[i].sender, txList[i].value))

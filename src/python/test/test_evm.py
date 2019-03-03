@@ -4,7 +4,7 @@ from evm import *
 
 def test():
     evm = EvmHandler()
-    with open(os.path.join(os.getcwd(), '../../static/Test.sol'), 'r') as f:
+    with open(os.path.join(os.path.dirname(__file__), '../../static/test/Test.sol'), 'r') as f:
         text = f.read()
     print("\ncontract\n")
     print(text)
