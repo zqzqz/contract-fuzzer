@@ -61,7 +61,7 @@ class ContractAbi:
         args = []
         inputAbi = self.interface[hash]["inputs"]
         for abi in inputAbi:
-            data = self.typeHandler.generateValueByType(abi["type"], "random")
+            data = self.typeHandler.fuzzByType(abi["type"], 0.5)
             args.append(data)
         return args
 
@@ -70,7 +70,7 @@ class ContractAbi:
         inputAbi = self.interface[hash]["inputs"]
         value = "0x"
         if self.interface[hash]['payable']:
-            value = self.typeHandler.generateValueByType("payment", "random")
+            value = self.typeHandler.fuzzByType("payment", 0.5)
         return value
 
     """

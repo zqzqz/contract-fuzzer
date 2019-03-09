@@ -2,10 +2,11 @@ from slither.slither import Slither
 from slither.slithir.operations import *
 import logging
 
+
 class Visitor():
-    def __init__(self, contract_visitor, function_visitor, node_visitor, ir_visitor):
+    def __init__(self, contract_visitor=None, function_visitor=None, node_visitor=None, ir_visitor=None):
         def default_visitor(obj):
-            print(obj)
+            pass
         self.default = default_visitor
         if contract_visitor:
             self.contract = contract_visitor
@@ -24,12 +25,13 @@ class Visitor():
         else:
             self.ir = default_visitor
 
+
 class IrAnalyzer():
     def __init__(self, filename=None, contract_name=None):
         self.slither = None
         self.contract_name = None
         if filename and contract_name:
-            self.load_contract(filename)
+            self.load_contract(filename, contract_name)
 
     def load_contract(self, filename, contract_name):
         self.slither = Slither(filename)
@@ -50,7 +52,7 @@ class IrAnalyzer():
                     """
                         This node object is for CFG, see https://github.com/trailofbits/slither/blob/master/slither/solc_parsing/cfg
                         and https://github.com/trailofbits/slither/blob/master/slither/core/cfg/node.py
-                    """ 
+                    """
                     visitor.node(node)
                     if node.irs:
                         for ir in node.irs:
@@ -62,12 +64,9 @@ class IrAnalyzer():
     @property
     def contracts(self):
         assert(self.slither != None)
-        return self.slither._contracts_by_id.values()
+        return self.slither.contracts
 
     @property
     def contract(self):
         assert(self.slither != None)
-        for contract in self.contracts:
-            if contract.name == self.contract_name:
-                return contract
-        return None
+        return self.slither.contracts_as_dict()[self.contract_name]

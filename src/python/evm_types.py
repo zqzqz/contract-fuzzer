@@ -111,3 +111,11 @@ class TypeHandler():
         else:
             logging.error("EVM type not found " + _type)
             return None
+
+    def fuzzByType(self, _type, seed_prob):
+        assert(seed_prob >= 0 and seed_prob <= 1)
+        rand_prob = random.random()
+        if rand_prob < seed_prob:
+            return self.generateValueByType(_type, mode="seed")
+        else:
+            return self.generateValueByType(_type, mode="random")
