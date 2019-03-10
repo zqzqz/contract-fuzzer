@@ -1,6 +1,8 @@
+import os
+
 TRAIN_CONFIG = {
-    "max_call_num": 3,
-    "max_func_num": 3,
+    "max_call_num": 2,
+    "max_func_num": 4,
     "max_func_arg": 6
 }
 
@@ -15,3 +17,8 @@ ANALYSIS_CONFIG = {
 ANALYSIS_CONFIG["max_length"] = ANALYSIS_CONFIG["max_line_num"] * (ANALYSIS_CONFIG["max_dep_num"] + 3)
 
 TRAIN_CONFIG["max_line_length"] = ANALYSIS_CONFIG["token_size"] * ANALYSIS_CONFIG["max_length"] + 32 * TRAIN_CONFIG["max_func_arg"] + 32 * 2 + 8
+
+DIR_CONFIG = {}
+DIR_CONFIG["experiment_dir"] = os.path.join(os.path.dirname(__file__), "experiments")
+DIR_CONFIG["seed_dir"] = os.path.join(os.path.dirname(__file__), "evm_types/seed")
+DIR_CONFIG["test_contract_dir"] = os.path.join(os.path.dirname(__file__), "test/contracts")

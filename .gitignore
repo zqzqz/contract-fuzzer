@@ -7,4 +7,4 @@ lib
 share
 __pycache__
 pip-selfcheck.json
-/src/python/experiments
+experiments

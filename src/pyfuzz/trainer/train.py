@@ -10,6 +10,7 @@ from collections import deque, namedtuple
 
 from pyfuzz.fuzzer.fuzzer import Fuzzer
 from pyfuzz.trainer.model import *
+from pyfuzz.config import *
 
 
 def deep_q_learning(sess,
@@ -56,8 +57,8 @@ def deep_q_learning(sess,
     """
     Transition = namedtuple(
         "Transition", ["state", "seq_len", "action", "reward", "next_state", "next_seq_len", "done"])
-    actionProcessor = ActionProcessor(env.maxFuncNum, env.maxCallNum)
-    stateProcessor = StateProcessor(env.maxFuncNum, env.maxCallNum)
+    actionProcessor = ActionProcessor()
+    stateProcessor = StateProcessor()
 
     # The replay memory
     replay_memory = []
@@ -208,20 +209,21 @@ def deep_q_learning(sess,
 
 
 def train():
+    print("training the DQN")
 
     # Where we save our checkpoints and graphs
-    experiment_dir = os.path.abspath("./experiments")
+    experiment_dir = DIR_CONFIG["experiment_dir"]
 
     # Create a glboal step variable
     global_step = tf.Variable(0, name='global_step', trainable=False)
 
     # Create estimators
     ap = ActionProcessor()
-    q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir, action_num=ap.actionNum)
+    q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir)
     target_estimator = Estimator(scope="target_q")
 
     env = Fuzzer(evmEndPoint=None)
-    filename = os.path.join(os.path.dirname(__file__), '../static/test/Test.sol')
+    filename = os.path.join(DIR_CONFIG["test_contract_dir"], 'Test.sol')
     env.loadContract(filename, "Test")
 
     with tf.Session() as sess:
@@ -242,7 +244,3 @@ def train():
                                         batch_size=16):
 
             print("\nEpisode Reward: {}".format(stats.episode_rewards[-1]))
-
-
-if __name__ == '__main__':
-    train()

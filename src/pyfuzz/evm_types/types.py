@@ -4,6 +4,8 @@ import codecs
 import random
 import json
 
+from pyfuzz.config import DIR_CONFIG
+
 # EVM Types
 type_list = {
     "uint256": {
@@ -29,7 +31,7 @@ mode_list = [
     "seed"
 ]
 
-seed_dir = os.path.join(os.path.dirname(__file__), "seed")
+seed_dir = DIR_CONFIG["seed_dir"]
 
 class TypeHandler():
     def __init__(self, _seed_dir=seed_dir, _type_list=type_list, _mode_list=mode_list):

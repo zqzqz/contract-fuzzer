@@ -123,6 +123,7 @@ class StateProcessor:
             self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
         
         self.sequence = self.sequence[1:]
+        self.sequence = np.expand_dims(self.sequence, axis=2)
         return self.sequence, self.txNum
 
     def decodeState(self, state):
@@ -134,7 +135,7 @@ class Estimator():
         Q-value estimator neural network
     """
 
-    def __init__(self, scope="estimator", summaries_dir=None, lstm_size=128):
+    def __init__(self, scope="estimator", summaries_dir=None):
         self.scope = scope
         # Writes Tensorboard summaries to disk
         self.summary_writer = None
@@ -143,7 +144,7 @@ class Estimator():
             line_num = TRAIN_CONFIG["max_func_num"]
             line_len = TRAIN_CONFIG["max_line_length"]
             action_num = TRAIN_CONFIG["action_num"]
-            self._build_model(line_num, line_len, action_num, lstm_size)
+            self._build_model(line_num, line_len, action_num)
             if summaries_dir:
                 summary_dir = os.path.join(
                     summaries_dir, "summaries_{}".format(scope))
@@ -151,10 +152,10 @@ class Estimator():
                     os.makedirs(summary_dir)
                 self.summary_writer = tf.summary.FileWriter(summary_dir)
 
-    def _build_model(self, line_num, line_len, action_num, lstm_size):
+    def _build_model(self, line_num, line_len, action_num):
         # Placeholders for our input
         self.X = tf.placeholder(
-            shape=[None, line_num, line_len], dtype=tf.uint8, name="X")
+            shape=[None, line_num, line_len, 1], dtype=tf.uint8, name="X")
         # The TD target value
         self.y = tf.placeholder(
             shape=[None], dtype=tf.float32, name="y")
@@ -165,26 +166,28 @@ class Estimator():
         self.real_seq_length = tf.placeholder(
             tf.float32, [None], name='real_seq_length')
 
-        X_f = tf.to_float(self.X)
+        X = tf.to_float(self.X)
         batch_size = tf.shape(self.X)[0]
 
-        # RNN
-        with tf.name_scope('RNN'):
-            self.cell = tf.nn.rnn_cell.LSTMCell(lstm_size)
-            self.cell = tf.contrib.rnn.DropoutWrapper(
-                self.cell, output_keep_prob=0.5)
-            self.outputs, self.states = tf.nn.dynamic_rnn(
-                self.cell, X_f, sequence_length=self.real_seq_length, dtype=tf.float32)
+        # CNN
+        with tf.name_scope('CNN'):
+            # Three convolutional layers
+            conv1 = tf.contrib.layers.conv2d(
+                inputs=X, num_outputs=32, kernel_size=[2, 32], activation_fn=tf.nn.relu)
+            conv2 = tf.contrib.layers.conv2d(
+                inputs=conv1, num_outputs=64, kernel_size=[2, 16], activation_fn=tf.nn.relu)
+            conv3 = tf.contrib.layers.conv2d(
+                inputs=conv2, num_outputs=64, kernel_size=[2, 8], activation_fn=tf.nn.relu)
+
+            pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=[2, 2], strides=2)
+
+            # Fully connected layers
+            flattened = tf.contrib.layers.flatten(pool3)
+            fc1 = tf.contrib.layers.fully_connected(flattened, 512)
+            self.predictions = tf.contrib.layers.fully_connected(fc1, action_num)
 
         # linear transformation
         with tf.name_scope("linear"):
-            output_wrapper = tf.get_variable(
-                'output_wrapper', shape=[lstm_size, action_num])
-            output_bias = tf.Variable(initial_value=tf.constant(
-                [0.1] * action_num), name='output_bias')
-            self.predictions = tf.nn.xw_plus_b(
-                self.states[-1], output_wrapper, output_bias, name='predictions')
-            # self.outputs = tf.argmax(self.predictions, axis=1, name='outputs')
             # Get the predictions for the chosen actions only
             gather_indices = tf.range(
                 batch_size) * tf.shape(self.predictions)[1] + self.actions
@@ -281,8 +284,7 @@ def make_epsilon_greedy_policy(estimator, nA):
     """
     def policy_fn(sess, observation, epsilon, seq_len):
         A = np.ones(nA, dtype=float) * epsilon / nA
-        q_values = estimator.predict(sess, np.expand_dims(
-            observation, 0), np.expand_dims(seq_len, 0))[0]
+        q_values = estimator.predict(sess, np.expand_dims(observation, 0), np.expand_dims(seq_len, 0))[0]
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
         return A

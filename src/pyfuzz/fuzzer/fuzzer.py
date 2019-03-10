@@ -3,7 +3,7 @@ from pyfuzz.fuzzer.interface import ContractAbi, Transaction
 from pyfuzz.trainer.model import *
 from pyfuzz.fuzzer.trace import *
 from pyfuzz.analyzer.static_analyzer import *
-from pyfuzz.config import TRAIN_CONFIG
+from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG
 
 import logging
 from random import randint
@@ -29,7 +29,7 @@ class Fuzzer():
         self.reports = []
         self.accounts = self.evm.getAccounts()
         self.defaultAccount = list(self.accounts.keys())[1]
-        with open(os.path.join(os.path.dirname(__file__), '../evm_types/seed/address.json'), 'w') as f:
+        with open(os.path.join(DIR_CONFIG["seed_dir"], 'address.json'), 'w') as f:
             json.dump(list(self.accounts.keys()), f, indent="\t")
         self.traceAnalyzer = TraceAnalyzer()
         self.staticAnalyzer = StaticAnalyzer()

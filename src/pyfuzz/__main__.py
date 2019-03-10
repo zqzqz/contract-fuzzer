@@ -1,20 +1,19 @@
-from fuzzer import *
-from model import *
+from pyfuzz.fuzzer.fuzzer import Fuzzer
+from pyfuzz.trainer.model import *
+from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG
+from pyfuzz.trainer.train import train
 import numpy as np
+import argparse
 
-
-def main():
-    # config
-    maxFuncNum = 3
-    maxCallNum = 3
+def fuzz():
+    print("fuzzing the contracts")
 
     # Where we save our checkpoints and graphs
-    experiment_dir = os.path.abspath("./experiments")
+    experiment_dir = DIR_CONFIG["experiment_dir"]
 
     # initialize fuzzer framework
-    env = Fuzzer(maxFuncNum=maxFuncNum,
-                 maxCallNum=maxCallNum, evmEndPoint=None)
-    filename = os.path.join(os.path.dirname(__file__), '../static/test/Test.sol')
+    env = Fuzzer(evmEndPoint=None)
+    filename = os.path.join(DIR_CONFIG["test_contract_dir"], 'Test.sol')
     env.loadContract(filename, "Test")
 
     # Create estimators
@@ -57,6 +56,18 @@ def main():
             if done:
                 break
 
+
+def main():
+    parser = argparse.ArgumentParser(description='Contract fuzzer')
+    parser.add_argument('--train', dest='train_mode', action='store_const',
+                        const=1, default=0,
+                        help='train q estimator for DQN in the fuzzer')
+
+    args = parser.parse_args()
+    if args.train_mode:
+        train()
+    else:
+        fuzz()
 
 if __name__ == '__main__':
     main()
