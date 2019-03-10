@@ -2,7 +2,8 @@ import logging
 import itertools
 import numpy as np
 import tensorflow as tf
-from utils import hexToUint8, removeHexPrefix
+from pyfuzz.utils.utils import *
+from pyfuzz.config import TRAIN_CONFIG
 import os
 
 actionList = ["insertFirst", "insertLast", "removeFirst",
@@ -18,12 +19,13 @@ class Action:
 class ActionProcessor:
     """
         map actions to integers
+        from 1 to maxFuncNum * 2 + maxCallNum * 3 + 2
     """
 
-    def __init__(self, maxFuncNum, maxCallNum):
-        self.maxFuncNum = maxFuncNum
-        self.maxCallNum = maxCallNum
-        self.actionNum = maxFuncNum * 2 + maxCallNum * 3 + 2
+    def __init__(self):
+        self.maxFuncNum = TRAIN_CONFIG["max_func_num"]
+        self.maxCallNum = TRAIN_CONFIG["max_call_num"]
+        self.actionNum = TRAIN_CONFIG["action_num"]
 
     def encodeAction(self, actionObj):
         actionId = actionObj.actionId
@@ -60,51 +62,88 @@ class State:
 
 class StateProcessor:
     """
-        map states to tensors
+        map states to tensors (maxFuncNum, maxLineLength)
+        [[static analysis of func x, transaction on func x (or zeros)],
+        ...
+         [static analysis of func y, transaction or zeros]]
     """
 
-    def __init__(self, maxFuncNum, maxCallNum, tokenSize=256, max_seq_len=256):
-        self.maxFuncNum = maxFuncNum
-        self.maxCallNum = maxCallNum
-        self.tokenSize = tokenSize
-        self.max_seq_len = max_seq_len
+    def __init__(self):
+        self.maxFuncNum = TRAIN_CONFIG["max_func_num"]
+        self.maxCallNum = TRAIN_CONFIG["max_call_num"]
+        self.maxFuncArg = TRAIN_CONFIG["max_func_arg"]
         self.sequence = None
-        self.seqLen = None
+        self.txNum = None
+        self.seqLen = TRAIN_CONFIG["max_line_length"]
 
     def encodeState(self, stateObj):
         staticAnalysis = stateObj.staticAnalysis
         txList = stateObj.txList
-        # encoding of staticAnalysis: todo
-        self.sequence = np.array([[0 for _ in range(self.tokenSize)]], dtype=np.uint8)
+        self.txNum = len(txList)
+        funcHashes = list(staticAnalysis.encoded_report.keys())
+
+        # encoding
+        self.sequence = np.array([[0 for _ in range(self.seqLen)]], dtype=np.uint8)
+
         for tx in txList:
-            self.processHexToken(tx.hash)
+            if tx.hash in funcHashes:
+                funcHashes.remove(tx.hash)
+            
+            txLine = np.array([], dtype=np.uint8)
+            if tx.hash not in staticAnalysis.encoded_report:
+                txStatic = "0" * (staticAnalysis.token_size // 4)
+            txStatic = intListToHexString(staticAnalysis.encoded_report[tx.hash], staticAnalysis.token_size)
+            txStatic = hexToBinary(txStatic, size=self.seqLen)
+            txLine = np.append(txLine, txStatic)
+            txLine = np.append(txLine, hexToBinary(tx.hash, 32))
+            txLine = np.append(txLine, hexToBinary(hex256ToHex32(tx.sender), 32))
+            txLine = np.append(txLine, hexToBinary(hex256ToHex32(tx.value), 32))
+
             for arg in tx.args:
-                self.processHexToken(arg)
-            self.processHexToken(tx.value)
-            self.processHexToken(tx.sender)
-        self.seqLen = self.sequence.shape[0]
-        while self.sequence.shape[0] < self.max_seq_len:
-            self.processHexToken("0x00")
-        return self.sequence, self.seqLen
+                txLine = np.append(txLine, hexToBinary(hex256ToHex32(arg), 32))
+
+            if txLine.shape[0] < self.sequence.shape[1]:
+                txLine = np.append(txLine, hexToBinary(
+                    "0x00", self.sequence.shape[1] - txLine.shape[0]))
+            elif txLine.shape[0] > self.sequence.shape[1]:
+                txLine = txLine[:self.sequence.shape[1]]
+            self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
+        
+        while self.sequence.shape[0] < self.maxFuncNum + 1:
+            txLine = np.array([], dtype=np.uint8)
+            if len(funcHashes) > 0:
+                funcHash = funcHashes[0]
+                funcHashes.remove(funcHash)
+                txStatic = intListToHexString(staticAnalysis.encoded_report[funcHash], staticAnalysis.token_size)
+                txStatic = hexToBinary(txStatic, size=self.seqLen)
+                txLine = np.append(txLine, txStatic)
+            if txLine.shape[0] < self.sequence.shape[1]:
+                txLine = np.append(txLine, hexToBinary(
+                    "0x00", self.sequence.shape[1] - txLine.shape[0]))
+            self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
+        
+        self.sequence = self.sequence[1:]
+        return self.sequence, self.txNum
 
     def decodeState(self, state):
         pass
 
-    def processHexToken(self, token):
-        self.sequence = np.append(self.sequence, np.expand_dims(hexToUint8(token, self.tokenSize), axis=0), axis=0)
 
 class Estimator():
     """
         Q-value estimator neural network
     """
 
-    def __init__(self, scope="estimator", summaries_dir=None, action_num=17, max_seq_len=256, lstm_size=128, token_size=256):
+    def __init__(self, scope="estimator", summaries_dir=None, lstm_size=128):
         self.scope = scope
         # Writes Tensorboard summaries to disk
         self.summary_writer = None
         with tf.variable_scope(scope):
             # Build the graph
-            self._build_model(max_seq_len, action_num, lstm_size, token_size)
+            line_num = TRAIN_CONFIG["max_func_num"]
+            line_len = TRAIN_CONFIG["max_line_length"]
+            action_num = TRAIN_CONFIG["action_num"]
+            self._build_model(line_num, line_len, action_num, lstm_size)
             if summaries_dir:
                 summary_dir = os.path.join(
                     summaries_dir, "summaries_{}".format(scope))
@@ -112,10 +151,10 @@ class Estimator():
                     os.makedirs(summary_dir)
                 self.summary_writer = tf.summary.FileWriter(summary_dir)
 
-    def _build_model(self, sequence_length, action_num, lstm_size, token_size=256):
+    def _build_model(self, line_num, line_len, action_num, lstm_size):
         # Placeholders for our input
         self.X = tf.placeholder(
-            shape=[None, sequence_length, token_size], dtype=tf.uint8, name="X")
+            shape=[None, line_num, line_len], dtype=tf.uint8, name="X")
         # The TD target value
         self.y = tf.placeholder(
             shape=[None], dtype=tf.float32, name="y")
@@ -147,8 +186,10 @@ class Estimator():
                 self.states[-1], output_wrapper, output_bias, name='predictions')
             # self.outputs = tf.argmax(self.predictions, axis=1, name='outputs')
             # Get the predictions for the chosen actions only
-            gather_indices = tf.range(batch_size) * tf.shape(self.predictions)[1] + self.actions
-            self.outputs = tf.gather(tf.reshape(self.predictions, [-1]), gather_indices)
+            gather_indices = tf.range(
+                batch_size) * tf.shape(self.predictions)[1] + self.actions
+            self.outputs = tf.gather(tf.reshape(
+                self.predictions, [-1]), gather_indices)
 
         # loss and accuracy
         with tf.name_scope('loss_accuracy'):
@@ -240,7 +281,8 @@ def make_epsilon_greedy_policy(estimator, nA):
     """
     def policy_fn(sess, observation, epsilon, seq_len):
         A = np.ones(nA, dtype=float) * epsilon / nA
-        q_values = estimator.predict(sess, np.expand_dims(observation, 0), np.expand_dims(seq_len, 0))[0]
+        q_values = estimator.predict(sess, np.expand_dims(
+            observation, 0), np.expand_dims(seq_len, 0))[0]
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
         return A

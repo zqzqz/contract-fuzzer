@@ -5,13 +5,13 @@ import grpc
 import os
 import logging
 
-import evm_pb2
-import evm_pb2_grpc
+import pyfuzz.evm.evm_pb2
+import pyfuzz.evm.evm_pb2_grpc
 
 class EvmHandler():
     def __init__(self, endpoint='localhost:50051'):
         self.channel = grpc.insecure_channel(endpoint)
-        self.stub = evm_pb2_grpc.EVMStub(self.channel)
+        self.stub = pyfuzz.evm.evm_pb2_grpc.EVMStub(self.channel)
 
     def reset(self, option=0):
         status = evm_pb2.Status(option=option)
@@ -19,7 +19,7 @@ class EvmHandler():
         return ret.option
 
     def getAccounts(self, option=0):
-        status = evm_pb2.Status(option=option)
+        status = pyfuzz.evm.evm_pb2.Status(option=option)
         ret = None
         for i in self.stub.GetAccounts(status):
             ret = i.data
@@ -31,7 +31,7 @@ class EvmHandler():
             return None
 
     def compile(self, text, name):
-        source = evm_pb2.Source(text=text, name=name)
+        source = pyfuzz.evm.evm_pb2.Source(text=text, name=name)
         ret = self.stub.Compile(source)
         if not ret or len(ret.data) > 0:
             return json.loads(ret.data)
@@ -40,7 +40,7 @@ class EvmHandler():
             return None
 
     def deploy(self, contract):
-        contractRpc = evm_pb2.Json(data=json.dumps(contract))
+        contractRpc = pyfuzz.evm.evm_pb2.Json(data=json.dumps(contract))
         ret = None
         for i in self.stub.Deploy(contractRpc):
             ret = i.address
@@ -48,7 +48,7 @@ class EvmHandler():
         return ret
 
     def sendTx(self, fromAddr, toAddr, value, data):
-        sendTxData = evm_pb2.SendTxData(fromAddr=fromAddr, toAddr=toAddr, value=value, data=data)
+        sendTxData = pyfuzz.evm.evm_pb2.SendTxData(fromAddr=fromAddr, toAddr=toAddr, value=value, data=data)
         ret = None
         for i in self.stub.SendTx(sendTxData):
             ret = i.data

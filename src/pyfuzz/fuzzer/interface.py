@@ -1,6 +1,6 @@
 import json
 import logging
-from evm_types import TypeHandler
+from pyfuzz.evm_types.types import TypeHandler
 
 
 class Transaction:
@@ -24,6 +24,7 @@ class ContractAbi:
     def __init__(self, contract=None):
         self.interface = {}
         self.funcHashList = []
+        self.functionHashes = None
         self.typeHandler = TypeHandler()
         if contract != None:
             self.loadAbi(contract)
@@ -37,6 +38,7 @@ class ContractAbi:
         self.interface = {}
         solcAbi = json.loads(contract["interface"])
         hashes = contract["functionHashes"]
+        self.functionHashes = hashes
 
         for abi in solcAbi:
             if abi["type"] == "constructor":
@@ -68,13 +70,13 @@ class ContractAbi:
     def generateTxValue(self, hash):
         assert(self.interface[hash] != None)
         inputAbi = self.interface[hash]["inputs"]
-        value = "0x"
+        value = ""
         if self.interface[hash]['payable']:
             value = self.typeHandler.fuzzByType("payment", 0.5)
         return value
 
     """
-        Input: 4 Byte function hash
+        Input: function hash
         Output: transaction
     """
 

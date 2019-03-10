@@ -1,6 +1,6 @@
-import sys
-sys.path.append("..")
-from evm import *
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+from pyfuzz.evm import EvmHandler
 
 def test():
     evm = EvmHandler()

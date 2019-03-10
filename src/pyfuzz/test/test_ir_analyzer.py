@@ -1,6 +1,6 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from ir_analyzer import *
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+from pyfuzz.analyzer.ir_analyzer import *
 
 def test():
     filename = os.path.join(os.path.dirname(__file__), '../../static/test/Test.sol')

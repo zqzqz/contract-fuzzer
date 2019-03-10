@@ -29,7 +29,7 @@ mode_list = [
     "seed"
 ]
 
-seed_dir = os.path.join(os.path.dirname(__file__), "../static/seed")
+seed_dir = os.path.join(os.path.dirname(__file__), "seed")
 
 class TypeHandler():
     def __init__(self, _seed_dir=seed_dir, _type_list=type_list, _mode_list=mode_list):

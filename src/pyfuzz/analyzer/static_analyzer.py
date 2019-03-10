@@ -1,5 +1,7 @@
-from ir_analyzer import Visitor, IrAnalyzer
+from pyfuzz.analyzer.ir_analyzer import Visitor, IrAnalyzer
+from pyfuzz.config import ANALYSIS_CONFIG
 import logging
+import eth_utils
 
 
 def print_reports(reports):
@@ -15,13 +17,35 @@ def print_reports(reports):
         print(str(reports), end=' ')
 
 
+class AnalysisReport():
+    def __init__(self, contract):
+        self.contract = contract
+        self.report = contract.report
+        self.encoded_report = contract.encoded_report
+        self.func_map = {}
+        self.token_size = ANALYSIS_CONFIG["token_size"]
+        self.max_dep_num = ANALYSIS_CONFIG["max_dep_num"]
+        self.max_line_num = ANALYSIS_CONFIG["max_line_num"]
+        self.max_length = ANALYSIS_CONFIG["max_length"]
+        for function in contract.functions:
+            if function.visibility != "public":
+                continue
+            full_name = function.full_name
+            func_hash = eth_utils.keccak(text=full_name).hex()[:8]
+            self.func_map[func_hash] = function.encode_id
+
+
 class StaticAnalyzer(IrAnalyzer):
     def __init__(self, filename=None, contract_name=None):
         super().__init__(filename, contract_name)
-        self.max_token_value = 256
-        self.max_read_num = 5
+        self.token_size = ANALYSIS_CONFIG["token_size"]
+        self.max_dep_num = ANALYSIS_CONFIG["max_dep_num"]
+        self.max_line_num = ANALYSIS_CONFIG["max_line_num"]
+        self.max_token_value = 2 ** self.token_size
+        self.max_length = ANALYSIS_CONFIG["max_length"]
         self.op_map = {"write": 1, "call": 2}
         self.solidity_var_map = {"msg.sender": 1, "msg.value": 2}
+        self.report = None
 
     @staticmethod
     def _parse_node_for_report(node):
@@ -71,22 +95,23 @@ class StaticAnalyzer(IrAnalyzer):
         """
         state_vars = contract.state_variables
         simplified_report = []
-        write_filter = [var.name for var in state_vars] + ["msg.sender", "msg.value"]
+        write_filter = [var.name for var in state_vars] + \
+            ["msg.sender", "msg.value"]
         dep_filter = {}
         for report_line in contract.report:
             function = report_line["func"]
             if function.visibility != "public":
                 contract.report.remove(report_line)
                 continue
-            if function.name not in dep_filter:
+            if function.full_name not in dep_filter:
                 func_args = report_line["func"].parameters
-                dep_filter[function.name] = write_filter
-                dep_filter[function.name] += [var.name for var in func_args]
+                dep_filter[function.full_name] = write_filter
+                dep_filter[function.full_name] += [var.name for var in func_args]
             if str(report_line["var"]) not in write_filter:
                 contract.report.remove(report_line)
                 continue
             for dep in report_line["deps"]:
-                if str(dep) not in dep_filter[function.name]:
+                if str(dep) not in dep_filter[function.full_name]:
                     report_line["deps"].remove(dep)
 
         return contract.report
@@ -96,7 +121,7 @@ class StaticAnalyzer(IrAnalyzer):
             Encode the report to a list of numbers.
             Using configurations in __init__
         """
-        encoded_report = []
+        encoded_report = {}
         state_var_map = {}
         func_map = {}
         arg_map = {}
@@ -117,8 +142,13 @@ class StaticAnalyzer(IrAnalyzer):
         # encode functions from 10...
         count = self.max_token_value * 2 // 4
         for function in contract.functions:
-            arg_map[str(function)] = {}
-            func_map[str(function)] = count
+            # init encoded report
+            full_name = function.full_name
+            func_hash = eth_utils.keccak(text=full_name).hex()[:8]
+            encoded_report[func_hash] = []
+
+            arg_map[function.full_name] = {}
+            func_map[function.full_name] = count
             # should record the encode_id in objects for the encoding of transactions later
             function.encode_id = count
             if (count + 1) < self.max_token_value:
@@ -127,20 +157,25 @@ class StaticAnalyzer(IrAnalyzer):
             # encode arguments
             arg_count = self.max_token_value * 3 // 4
             for arg in function.parameters:
-                arg_map[str(function)][str(arg)] = arg_count
+                arg_map[function.full_name][str(arg)] = arg_count
                 if (arg_count + 1) < self.max_token_value:
                     arg_count += 1
 
         # encode each function arguments
+        line_count = 0
         for report_line in contract.report:
-            encoded_report.append(get_code(str(report_line["func"]), func_map))
-            encoded_report.append(
+            if line_count > self.max_line_num:
+                break
+            full_name = report_line["func"].full_name
+            func_hash = eth_utils.keccak(text=full_name).hex()[:8]
+            encoded_report[func_hash].append(get_code(full_name, func_map))
+            encoded_report[func_hash].append(
                 get_code(str(report_line["var"]), state_var_map))
-            encoded_report.append(
+            encoded_report[func_hash].append(
                 get_code(str(report_line["op"]), self.op_map))
             count = 0
             for dep in report_line["deps"]:
-                if count > self.max_read_num:
+                if count > self.max_dep_num:
                     break
                 code = 0
                 # it is solidity argument
@@ -153,17 +188,23 @@ class StaticAnalyzer(IrAnalyzer):
 
                 # it is function parameters
                 if not code:
-                    func = get_code(str(report_line["func"]), arg_map)
+                    func = get_code(full_name, arg_map)
                     if func == None:
                         code = 0
                     else:
                         code = get_code(str(dep), func)
                 if code:
-                    encoded_report.append(code)
+                    encoded_report[func_hash].append(code)
                     count += 1
-            if count < self.max_read_num:
-                encoded_report += [0 for i in range(self.max_read_num - count)]
-        contract.encoded_report = encoded_report
+            if count < self.max_dep_num:
+                encoded_report[func_hash] += [
+                    0 for i in range(self.max_dep_num - count)]
+
+        for full_hash in encoded_report:
+            if len(encoded_report[func_hash]) < self.max_length:
+                encoded_report[func_hash] += [0 for i in range(self.max_length - len(encoded_report[func_hash]))]
+
+        contract.encoded_report=encoded_report
         return encoded_report
 
     # todo
@@ -171,6 +212,10 @@ class StaticAnalyzer(IrAnalyzer):
         pass
 
     def run(self, debug=0):
+        """
+            return an AnalysisReport object, the report has the format:
+            function full name (key) => a list of numbers
+        """
         self.taint_analysis()
 
         # parse report
@@ -182,12 +227,16 @@ class StaticAnalyzer(IrAnalyzer):
             Visitor(contract_visitor=self._parse_contract_for_report))
 
         # select main contract
-        contract = self.contract
+        contract=self.contract
         assert(contract != None)
 
-        report = self._simplify_contract_report(contract)
+        report=self._simplify_contract_report(contract)
         if debug:
             print_reports(report)
-        
-        encoded_report = self._encode_contract_report(contract)
-        return encoded_report
+
+        encoded_report=self._encode_contract_report(contract)
+        if debug:
+            print(encoded_report)
+
+        self.report=AnalysisReport(contract)
+        return self.report

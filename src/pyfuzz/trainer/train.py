@@ -8,8 +8,8 @@ import psutil
 import tensorflow as tf
 from collections import deque, namedtuple
 
-from fuzzer import *
-from model import *
+from pyfuzz.fuzzer.fuzzer import Fuzzer
+from pyfuzz.trainer.model import *
 
 
 def deep_q_learning(sess,
@@ -208,9 +208,6 @@ def deep_q_learning(sess,
 
 
 def train():
-    # config
-    maxFuncNum = 3
-    maxCallNum = 3
 
     # Where we save our checkpoints and graphs
     experiment_dir = os.path.abspath("./experiments")
@@ -219,14 +216,13 @@ def train():
     global_step = tf.Variable(0, name='global_step', trainable=False)
 
     # Create estimators
-    ap = ActionProcessor(maxFuncNum=maxFuncNum, maxCallNum=maxCallNum)
+    ap = ActionProcessor()
     q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir, action_num=ap.actionNum)
     target_estimator = Estimator(scope="target_q")
 
-    env = Fuzzer(maxFuncNum=maxFuncNum, maxCallNum=maxCallNum, evmEndPoint=None)
-    with open(os.path.join(os.getcwd(), '../static/Test.sol'), 'r') as f:
-        text = f.read()
-    env.loadContract(text, "Test")
+    env = Fuzzer(evmEndPoint=None)
+    filename = os.path.join(os.path.dirname(__file__), '../static/test/Test.sol')
+    env.loadContract(filename, "Test")
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())

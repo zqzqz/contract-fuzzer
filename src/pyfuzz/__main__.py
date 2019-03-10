@@ -14,9 +14,8 @@ def main():
     # initialize fuzzer framework
     env = Fuzzer(maxFuncNum=maxFuncNum,
                  maxCallNum=maxCallNum, evmEndPoint=None)
-    with open(os.path.join(os.getcwd(), '../static/Test.sol'), 'r') as f:
-        text = f.read()
-    env.loadContract(text, "Test")
+    filename = os.path.join(os.path.dirname(__file__), '../static/test/Test.sol')
+    env.loadContract(filename, "Test")
 
     # Create estimators
     actionProcessor = ActionProcessor(env.maxFuncNum, env.maxCallNum)

@@ -1,16 +1,16 @@
-from evm import *
-from interface import ContractAbi, Transaction
-import types
+from pyfuzz.evm.evm import *
+from pyfuzz.fuzzer.interface import ContractAbi, Transaction
+from pyfuzz.trainer.model import *
+from pyfuzz.fuzzer.trace import *
+from pyfuzz.analyzer.static_analyzer import *
+from pyfuzz.config import TRAIN_CONFIG
+
 import logging
 from random import randint
 import json
 
-from model import *
-from trace import *
-
-
 class Fuzzer():
-    def __init__(self, maxFuncNum=3, maxCallNum=3, evmEndPoint=None):
+    def __init__(self, evmEndPoint=None):
         if evmEndPoint:
             self.evm = EvmHandler(evmEndPoint)
         else:
@@ -18,25 +18,32 @@ class Fuzzer():
         self.contract = None
         self.contractAddress = None
         self.contractAbi = None
-        self.maxFuncNum = maxFuncNum
-        self.maxCallNum = maxCallNum
         self.state = None
         self.seqLen = None
-        self.stateProcessor = StateProcessor(maxFuncNum, maxCallNum)
-        self.actionProcessor = ActionProcessor(maxFuncNum, maxCallNum)
+        self.maxFuncNum = TRAIN_CONFIG["max_func_num"]
+        self.maxCallNum = TRAIN_CONFIG["max_call_num"]
+        self.actionNum = TRAIN_CONFIG["action_num"]
+        self.stateProcessor = StateProcessor()
+        self.actionProcessor = ActionProcessor()
         self.traces = []
         self.reports = []
         self.accounts = self.evm.getAccounts()
         self.defaultAccount = list(self.accounts.keys())[1]
-        with open(os.path.join(os.path.dirname(__file__), '../static/seed/address.json'), 'w') as f:
+        with open(os.path.join(os.path.dirname(__file__), '../evm_types/seed/address.json'), 'w') as f:
             json.dump(list(self.accounts.keys()), f, indent="\t")
         self.traceAnalyzer = TraceAnalyzer()
+        self.staticAnalyzer = StaticAnalyzer()
         self.counter = 0
 
-    def loadContract(self, source, name):
-        self.contract = self.evm.compile(source, name)
+    def loadContract(self, filename, contract_name):
+        with open(filename, "r") as f:
+            source = f.read()
+        self.contract = self.evm.compile(source, contract_name)
         # self.contractAddress = self.evm.deploy(self.contract)
         self.contractAbi = ContractAbi(self.contract)
+        # run static analysis
+        self.staticAnalyzer.load_contract(filename, contract_name)
+        self.staticAnalyzer.run()
 
     def runOneTx(self, tx):
         if self.contract == None:
@@ -107,8 +114,7 @@ class Fuzzer():
             funcHash = state.txList[actionArg].hash
             if actionId == 4:
                 # modify args
-                txList[actionArg].args = self.contractAbi.generateTxArgs(
-                    funcHash)
+                txList[actionArg].args = self.contractAbi.generateTxArgs(funcHash)
             elif actionId == 5:
                 # modify sender
                 sender = state.txList[actionArg].sender
@@ -141,7 +147,7 @@ class Fuzzer():
             return
         self.contractAddress = self.evm.deploy(self.contract)
         # todo
-        self.state = State(None, [])
+        self.state = State(self.staticAnalyzer.report, [])
         self.traces = []
         self.reports = []
         # randomFuncIndex = randint(0, len(self.contractAbi.funcHashList)-1)

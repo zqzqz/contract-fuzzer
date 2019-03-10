@@ -1,8 +1,6 @@
 import logging
 
 # todo
-
-
 class TraceAnalyzer:
     def __init__(self):
         pass

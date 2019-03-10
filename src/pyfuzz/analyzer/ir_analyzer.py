@@ -1,6 +1,7 @@
 from slither.slither import Slither
 from slither.slithir.operations import *
 import logging
+import time
 
 
 class Visitor():
@@ -34,8 +35,11 @@ class IrAnalyzer():
             self.load_contract(filename, contract_name)
 
     def load_contract(self, filename, contract_name):
-        self.slither = Slither(filename)
         self.contract_name = contract_name
+        self.slither = Slither(filename)
+        while not self.slither.analyzed:
+            # wait for analyzing
+            pass
 
     def parse_contracts(self, visitor):
         for contract in self.contracts:
