@@ -243,6 +243,7 @@ class StaticAnalyzer(IrAnalyzer):
     def taint_analysis(self):
         for contract in self.contracts:
             for function in contract.functions:
+                if function.nodes == []: break
                 node_Num = 0
                 while True:
                     if (function.nodes[node_Num]._sons == []): break
@@ -272,7 +273,7 @@ class StaticAnalyzer(IrAnalyzer):
                                 branch_taint.append(var)
                         for node in br_node._sons:
                             if (node._expression == None):
-                                node_Num = node._sons[0]
+                                node_Num = node._sons[0]._node_id
                             else:
                                 for var in node._vars_read:
                                     if var in function.taintList:
