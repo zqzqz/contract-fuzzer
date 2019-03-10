@@ -207,15 +207,93 @@ class StaticAnalyzer(IrAnalyzer):
         contract.encoded_report=encoded_report
         return encoded_report
 
-    # todo
+    # add property and method to function object
+    def pre_taint(self):
+        for contract in self.contracts:
+            def setSource(self):
+                '''
+                :parameter
+                :msg.sender; msg.value
+                '''
+                msg = ['msg.value','msg.sender']
+                p_vars = [p_var._name for p_var in self._parameters if p_var != None]
+                for var in p_vars:
+                    self.taintSource.append(var)
+                    self.taintList[var] = [var]
+                for event in msg:
+                    if not(event in self.taintSource):
+                        self.taintSource.append(event)
+                        self.taintList[event] = [event]
+
+                # self means function object
+            def setSink(self):
+                state_vars = [s_var._name for s_var in self._state_vars_written]
+                for var in state_vars: self.taintSink.append(var)
+                # anything need to add?
+
+            for function in contract.functions:
+                # list of variable, add property 'taintMark' list to each variable
+                function.taintSource = [] # taintMark=None
+                function.taintSink = []
+                function.taintList = {} # key:mark; value:[v1,v2...]
+                function.setSource = MethodType(setSource, function)
+                function.setSink = MethodType(setSink, function)
+                # to do
+
     def taint_analysis(self):
-        pass
+        for contract in self.contracts:
+            for function in contract.functions:
+                node_Num = 0
+                while True:
+                    if (function.nodes[node_Num]._sons == []): break
+                    # do propagation policy
+                    if (hex(function.nodes[node_Num]._node_type)=='0x11'): # return
+                        pass
+                    elif (hex(function.nodes[node_Num]._node_type)=='0x0'): # entry point
+                        pass
+                    elif (hex(function.nodes[node_Num]._node_type) in ['0x10','0x13']): # expression or new variable
+                        for var in function.nodes[node_Num]._vars_read:
+                            if var in function.taintList:
+                                # deal with function.nodes[node_Num]._var_written
+                                for w_var in function.nodes[node_Num]._vars_written:
+                                    if not(w_var in function.taintList[var]):
+                                        function.taintList[var].append(w_var)
+                    elif (hex(function.nodes[node_Num]._node_type)=='0x40'): # PLACEHOLDER for modifier, _
+                        pass
+                    elif (hex(function.nodes[node_Num]._node_type) == '0x51'): # for loop; 0x15 and 0x52 is included
+                        node_Num = function.nodes[node_Num]._sons[0]._node_id
+                        pass
+                    elif (hex(function.nodes[node_Num]._node_type) in ['0x12','0x15']): # if branch; 0x50 is included
+                        # mark taint
+                        branch_taint =[]
+                        br_node = function.nodes[node_Num]
+                        for var in br_node._vars_read:
+                            if var in function.taintList:
+                                branch_taint.append(var)
+                        for node in br_node._sons:
+                            if (node._expression == None):
+                                node_Num = node._sons[0]
+                            else:
+                                for var in node._vars_read:
+                                    if var in function.taintList:
+                                        for w_var in br_node._vars_written:
+                                            if not (w_var in function.taintList[var]):
+                                                function.taintList[var].append(w_var)
+                                for var in branch_taint:
+                                    for w_var in br_node._vars_written:
+                                        if not (w_var in function.taintList[var]):
+                                            function.taintList[var].append(w_var)
+                    # next node
+                    if len(function.nodes[node_Num]._sons) == 1:
+                        node_Num = function.nodes[node_Num]._sons[0]._node_id
+
 
     def run(self, debug=0):
         """
             return an AnalysisReport object, the report has the format:
             function full name (key) => a list of numbers
         """
+        self.pre_taint()
         self.taint_analysis()
 
         # parse report
