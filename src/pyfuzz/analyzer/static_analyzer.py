@@ -2,7 +2,7 @@ from pyfuzz.analyzer.ir_analyzer import Visitor, IrAnalyzer
 from pyfuzz.config import ANALYSIS_CONFIG
 import logging
 import eth_utils
-
+from types import MethodType
 
 def print_reports(reports):
     if isinstance(reports, list):
@@ -243,6 +243,8 @@ class StaticAnalyzer(IrAnalyzer):
     def taint_analysis(self):
         for contract in self.contracts:
             for function in contract.functions:
+                function.setSink()
+                function.setSource()
                 if function.nodes == []: break
                 node_Num = 0
                 while True:
@@ -254,11 +256,11 @@ class StaticAnalyzer(IrAnalyzer):
                         pass
                     elif (hex(function.nodes[node_Num]._node_type) in ['0x10','0x13']): # expression or new variable
                         for var in function.nodes[node_Num]._vars_read:
-                            if var in function.taintList:
+                            if var._name in function.taintList:
                                 # deal with function.nodes[node_Num]._var_written
                                 for w_var in function.nodes[node_Num]._vars_written:
-                                    if not(w_var in function.taintList[var]):
-                                        function.taintList[var].append(w_var)
+                                    if not(w_var._name in function.taintList[var._name]):
+                                        function.taintList[var._name].append(w_var._name)
                     elif (hex(function.nodes[node_Num]._node_type)=='0x40'): # PLACEHOLDER for modifier, _
                         pass
                     elif (hex(function.nodes[node_Num]._node_type) == '0x51'): # for loop; 0x15 and 0x52 is included
@@ -269,24 +271,25 @@ class StaticAnalyzer(IrAnalyzer):
                         branch_taint =[]
                         br_node = function.nodes[node_Num]
                         for var in br_node._vars_read:
-                            if var in function.taintList:
-                                branch_taint.append(var)
+                            if var._name in function.taintList:
+                                branch_taint.append(var._name)
                         for node in br_node._sons:
                             if (node._expression == None):
                                 node_Num = node._sons[0]._node_id
                             else:
                                 for var in node._vars_read:
-                                    if var in function.taintList:
+                                    if var._name in function.taintList:
                                         for w_var in br_node._vars_written:
-                                            if not (w_var in function.taintList[var]):
-                                                function.taintList[var].append(w_var)
-                                for var in branch_taint:
+                                            if not (w_var._name in function.taintList[var._name]):
+                                                function.taintList[var._name].append(w_var._name)
+                                for varName in branch_taint:
                                     for w_var in br_node._vars_written:
-                                        if not (w_var in function.taintList[var]):
-                                            function.taintList[var].append(w_var)
+                                        if not (w_var in function.taintList[varName]):
+                                            function.taintList[varName].append(w_var)
                     # next node
                     if len(function.nodes[node_Num]._sons) == 1:
                         node_Num = function.nodes[node_Num]._sons[0]._node_id
+
 
 
     def run(self, debug=0):
