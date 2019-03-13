@@ -51,14 +51,61 @@ def hexToBinary(hexStr, size=None):
         count += 1
     return uintArr
 
+def binaryToHex(binary, size=None):
+    assert(size == None or size > 0)
+    if size != None:
+        binary = np.append(binary, np.array([0] * (size - len(binary)), dtype=np.uint8))
+    if len(binary) % 4 != 0:
+        binary = np.append(binary, np.array([0] * (4 - (len(binary) % 4)), dtype=np.uint8))
+    hexStr = ""
+    for i in range(0, len(binary), 4):
+        sub_binary = binary[i:i+4]
+        sub_num = 0
+        for k in sub_binary:
+            sub_num = sub_num * 2 + k
+        hexStr += hex(sub_num).rstrip("L").lstrip("0x") or "0"
+    return hexStr
+
+def negativeValue(value, size):
+    binary = hexToBinary(value, size)
+    binary[0] = 0
+    for i in range(len(binary)):
+        if binary[i] == 0:
+            binary[i] = 1
+        else:
+            binary[i] = 0
+    for i in range(len(binary)):
+        binary[-(i+1)] += 1
+        if binary[-(i+1)] >= 2:
+            binary[-(i+1)] = 0
+            continue
+        else:
+            break
+    hexStr = binaryToHex(binary, size)
+    return hexStr
+
+
+def formatHexValue(value, size, flag=1):
+    if len(value) > size // 4:
+        if flag:
+            return value[-size:]
+        else:
+            return value[:size]
+    elif len(value) < size // 4:
+        if flag:
+            return "0" * (size // 4 - len(value)) + value
+        else:
+            return value + "0" * (size // 4 - len(value))
+    else:
+        return value
+
 def removeHexPrefix(hexStr):
     assert(isHexString(hexStr))
     return hexStr.replace("0x", "")
 
 
 def isHexString(hexStr):
-    if re.match("^(0x)?[0-9a-fA-F]*$", hexStr):
-        return True
+    return isinstance(hexStr, str) and re.match("^(0x)?[0-9a-fA-F]*$", hexStr)
 
 def hex256ToHex32(hexStr):
     assert(isHexString(hexStr))
@@ -74,6 +121,16 @@ def hex256ToHex32(hexStr):
     res += hex_power[-2:]
     assert(len(res) == 8)
     return res
+
+def valueToHex32(value):
+    if isHexString(value):
+        _value = removeHexPrefix(value)
+        return hex256ToHex32(_value)
+    elif isinstance(value, int):
+        _value = hex(value).rstrip("L").lstrip("-").lstrip("0x") or "00"
+        if value < 0:
+            _value = negativeValue(_value, 256)
+        return hex256ToHex32(_value)
 
 def intToHex(num, token_size):
     assert(isinstance(num, int))

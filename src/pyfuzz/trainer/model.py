@@ -96,11 +96,12 @@ class StateProcessor:
             txStatic = hexToBinary(txStatic, size=self.seqLen)
             txLine = np.append(txLine, txStatic)
             txLine = np.append(txLine, hexToBinary(tx.hash, 32))
-            txLine = np.append(txLine, hexToBinary(hex256ToHex32(tx.sender), 32))
-            txLine = np.append(txLine, hexToBinary(hex256ToHex32(tx.value), 32))
+            txLine = np.append(txLine, hexToBinary(valueToHex32(tx.sender), 32))
+            txLine = np.append(txLine, hexToBinary(valueToHex32(tx.value), 32))
 
-            for arg in tx.args:
-                txLine = np.append(txLine, hexToBinary(hex256ToHex32(arg), 32))
+            arg_1d_list = eval('[%s]'%repr(tx.args).replace('[', '').replace(']', ''))
+            for arg in arg_1d_list:
+                txLine = np.append(txLine, hexToBinary(valueToHex32(arg), 32))
 
             if txLine.shape[0] < self.sequence.shape[1]:
                 txLine = np.append(txLine, hexToBinary(
@@ -108,7 +109,7 @@ class StateProcessor:
             elif txLine.shape[0] > self.sequence.shape[1]:
                 txLine = txLine[:self.sequence.shape[1]]
             self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
-        
+
         while self.sequence.shape[0] < self.maxFuncNum + 1:
             txLine = np.array([], dtype=np.uint8)
             if len(funcHashes) > 0:
@@ -123,7 +124,7 @@ class StateProcessor:
             self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
         
         self.sequence = self.sequence[1:]
-        self.sequence = np.expand_dims(self.sequence, axis=2)
+        self.sequence = np.expand_dims(self.sequence, axis=0)
         return self.sequence, self.txNum
 
     def decodeState(self, state):

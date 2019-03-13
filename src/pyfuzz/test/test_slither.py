@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger("Slither")
 
-filename = os.path.join(os.path.dirname(__file__), '../../static/test/Test.sol')
+filename = os.path.join(os.path.dirname(__file__), '../test/contracts/Test.sol')
 
 slither = Slither(filename)
 printer = PrinterSlithIR(slither, logger)

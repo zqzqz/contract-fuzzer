@@ -1,21 +1,23 @@
 import json
 import logging
+import eth_abi
 from pyfuzz.evm_types.types import TypeHandler
+from pyfuzz.config import FUZZ_CONFIG
 
 
 class Transaction:
-    def __init__(self, hash, args, value, sender):
+    def __init__(self, hash, args, value, sender, abi):
         self.hash = hash
         self.args = args
         self.value = value
         self.sender = sender
         self.trace = None
+        self.abi = abi
 
     @property
     def payload(self):
-        payload = self.hash
-        for arg in self.args:
-            payload += arg
+        abi_array = [abi_input["type"] for abi_input in self.abi["inputs"]]
+        payload = self.hash + eth_abi.encode_abi(abi_array, self.args).hex()
         return payload
 
 
@@ -63,7 +65,7 @@ class ContractAbi:
         args = []
         inputAbi = self.interface[hash]["inputs"]
         for abi in inputAbi:
-            data = self.typeHandler.fuzzByType(abi["type"], 0.5)
+            data = self.typeHandler.fuzzByType(abi["type"], SEED_CONFIG["seed_prob"])
             args.append(data)
         return args
 
@@ -72,7 +74,7 @@ class ContractAbi:
         inputAbi = self.interface[hash]["inputs"]
         value = ""
         if self.interface[hash]['payable']:
-            value = self.typeHandler.fuzzByType("payment", 0.5)
+            value = self.typeHandler.fuzzByType("payment", SEED_CONFIG["seed_prob"])
         return value
 
     """
@@ -83,4 +85,4 @@ class ContractAbi:
     def generateTx(self, hash, sender):
         args = self.generateTxArgs(hash)
         value = self.generateTxValue(hash)
-        return Transaction(hash, args, value, sender)
+        return Transaction(hash, args, value, sender, self.interface[hash])

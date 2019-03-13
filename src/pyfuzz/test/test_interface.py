@@ -1,17 +1,16 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from interface import *
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+from pyfuzz.fuzzer.interface import *
 
 def test():
-    import evm
-    import os
     contract = None
     with open(os.path.join(os.path.dirname(__file__), '../../static/test/testContract.json'), 'r') as f:
         contract = json.load(f)
     abi = ContractAbi(contract)
     print(abi.interface)
 
-    tx = Transaction("23423424", ["1111", "2222"], "1212", "0x123123123123")
+    func_hash = contract["functionHashes"]["test1(uint256)"]
+    tx = Transaction(func_hash, [12345], "1212", "0x123123123123", abi.interface[func_hash])
     print(tx.payload)
 
 if __name__ == "__main__":

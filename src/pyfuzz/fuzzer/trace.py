@@ -1,6 +1,5 @@
 import logging
 
-# todo
 class TraceAnalyzer:
     def __init__(self):
         pass
@@ -13,8 +12,12 @@ class TraceAnalyzer:
           report (list(string)): found vulnerabilities
           reward (int): calculated reward
     """
-
     def run(self, ptraces, ctraces):
+        report = []
+        reward = self.path_variaty(ptraces, ctraces)
+        return report, reward
+
+    def path_variaty(self, ptraces, ctraces):
         pJumps = []
         cJumps = []
         for ptrace in ptraces:
@@ -35,4 +38,4 @@ class TraceAnalyzer:
             comJumpNum = len(pJumps) + len(cJumps) - len(difJumps)
             reward = (len(pJumps) + len(cJumps) -
                       2 * comJumpNum) / len(difJumps)
-        return [], reward
+        return reward

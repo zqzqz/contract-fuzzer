@@ -6,7 +6,7 @@ contract Test {
 
     function test1(uint a) public {
         owner = msg.sender;
-        payments[msg.sender] = a;
+        payments[msg.sender] += a;
     }
 
     function test2() public {

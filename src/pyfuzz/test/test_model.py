@@ -14,10 +14,10 @@ if __name__ == '__main__':
     action = actionProcessor.decodeAction(action)
     print("action:", action.actionId, action.actionArg)
 
-    filename = os.path.join(os.path.dirname(__file__), '../../static/test/Test.sol')
+    filename = os.path.join(os.path.dirname(__file__), '../test/contracts/Test.sol')
     analyzer = StaticAnalyzer(filename, "Test")
     report = analyzer.run(debug=0)
 
-    state = State(report, [Transaction(list(report.func_map.keys())[0], ["1111111111111111111", "2222222222222222222222"], "121212121212121212121212", "123123123123")])
+    state = State(report, [Transaction(list(report.func_map.keys())[0], [12345], "121212121212121212121212", "123123123123", {"inputs": [{"type": "uint256"}]})])
     state, seqLen = stateProcessor.encodeState(state)
     print("state", state)

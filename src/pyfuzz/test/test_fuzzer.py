@@ -3,7 +3,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 from pyfuzz.fuzzer.fuzzer import Fuzzer
 
 def test():
-    filename = os.path.join(os.path.dirname(__file__), '../../static/test/Test.sol')
+    filename = os.path.join(os.path.dirname(__file__), '../test/contracts/Test.sol')
     fuzzer = Fuzzer()
     fuzzer.loadContract(filename, "Test")
     print("Reset...")

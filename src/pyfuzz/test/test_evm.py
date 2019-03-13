@@ -4,7 +4,7 @@ from pyfuzz.evm import EvmHandler
 
 def test():
     evm = EvmHandler()
-    with open(os.path.join(os.path.dirname(__file__), '../../static/test/Test.sol'), 'r') as f:
+    with open(os.path.join(os.path.dirname(__file__), '../test/contracts/Test.sol'), 'r') as f:
         text = f.read()
     print("\ncontract\n")
     print(text)
@@ -17,6 +17,10 @@ def test():
     print("\nTesting deploy\n")
     address = evm.deploy(contract)
     print(address)
+    print("\nTesting sendTx\n")
+    trace = evm.sendTx(list(accounts.keys())[0], address, "0", contract["functionHashes"]["test2()"])
+    for t in trace:
+        print(t["op"], end=" ")
 
 if __name__ == "__main__":
     test()

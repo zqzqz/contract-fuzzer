@@ -4,13 +4,14 @@ let evm = require("../EVMHandler");
 let blockchain = require("../blockchain");
 
 let name = "Test";
-let source = fs.readFileSync(path.join(__dirname, "../../static/test/Test.sol"), 'utf-8');
+let source = fs.readFileSync(path.join(__dirname, "../../static/contracts/Test.sol"), 'utf-8');
 let address = null;
 let txhash = null;
 
 evm.init()
 let accs = Object.keys(evm.accounts);
 let contract = evm.compile(source, name);
+fs.writeFileSync("testContract.json", JSON.stringify(contract, null, 2));
 // console.log(contract)
 evm.deploy(contract).then((result) => {
   console.log("contract deployed:", result.tx.contractAddress);
