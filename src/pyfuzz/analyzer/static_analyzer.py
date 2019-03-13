@@ -210,85 +210,125 @@ class StaticAnalyzer(IrAnalyzer):
     # add property and method to function object
     def pre_taint(self):
         for contract in self.contracts:
+            # self means function object
             def setSource(self):
                 '''
                 :parameter
                 :msg.sender; msg.value
                 '''
-                msg = ['msg.value','msg.sender']
+                msg = ['msg.value', 'msg.sender']
                 p_vars = [p_var._name for p_var in self._parameters if p_var != None]
                 for var in p_vars:
                     self.taintSource.append(var)
                     self.taintList[var] = [var]
                 for event in msg:
-                    if not(event in self.taintSource):
+                    if not (event in self.taintSource):
                         self.taintSource.append(event)
                         self.taintList[event] = [event]
 
-                # self means function object
             def setSink(self):
                 state_vars = [s_var._name for s_var in self._state_vars_written]
                 for var in state_vars: self.taintSink.append(var)
                 # anything need to add?
 
+            def setFlag(self):
+                for node in self.nodes:
+                    if (hex(node._node_type) == '0x50'):
+                        node.flag = 0
+                    if (hex(node._node_type) in ['0x12', '0x15']):
+                        node.flag = 2
+
+            def set_br_taint(self):
+                for node in self.nodes:
+                    if (hex(node._node_type) in ['0x12', '0x15']):
+                        self.branch_taint[node._node_id] = []
+                        r_vars = [r_var._name for r_var in node._vars_read if r_var != None]
+                        for var_name in r_vars:
+                            if var_name in function.taintList:
+                                self.branch_taint[node._node_id].append(var_name)
+
             for function in contract.functions:
                 # list of variable, add property 'taintMark' list to each variable
-                function.taintSource = [] # taintMark=None
+                function.taintSource = []  # taintMark=None
                 function.taintSink = []
-                function.taintList = {} # key:mark; value:[v1,v2...]
+                function.taintList = {}  # key:mark; value:[v1,v2...]
+                function.branch_taint = {}  # key:_node_id; value:[v1,v2..]
+                function.current_br_taint = []
                 function.setSource = MethodType(setSource, function)
                 function.setSink = MethodType(setSink, function)
-                # to do
+                function.setFlag = MethodType(setFlag, function)
+                function.set_br_taint = MethodType(set_br_taint, function)
 
     def taint_analysis(self):
+        # two important function used in taint analysis
+        def propagation(function, stack):
+            top = stack[len(stack) - 1]
+            # extra policy for branch node
+            # IF node
+            if (hex(top._node_type) == '0x12'):  # IF
+                top.flag -= 1
+                function.current_br_taint.append(function.branch_taint[top._node_id])
+                return top._sons[1 - top.flag]
+            # END_IF node
+            elif (hex(top._node_type) == '0x50'):
+                while (hex(stack[len(stack) - 1]._node_type) != '0x12'):
+                    pop_action(function, stack)
+                IF_node = stack[len(stack) - 1]
+                pop_action(function, stack)
+                function.current_br_taint.pop()
+                if (IF_node.flag > 0):
+                    return IF_node
+                else:
+                    pop_action(function, stack)
+                    # return top._sons[0]
+            # IF_LOOP node
+            elif (hex(top._node_type) == '0x15'):
+                top.flag -= 1
+                function.current_br_taint.append(function.branch_taint[top._node_id])
+                return top._sons[top.flag]
+            # END_LOOP node
+            elif (hex(top._node_type) == '0x52'):
+                while (hex(stack[len(stack) - 1]._node_type) != '0x51'):
+                    pop_action(function, stack)
+                pop_action(function, stack)
+                function.current_br_taint.pop()
+                # return top._sons[0]
+            # straight line flow node
+            return top._sons[0]
+
+        def pop_action(function, stack):
+            node = stack.pop()
+            for var in node._vars_read:
+                if var._name in function.taintList:
+                    for w_var in node._vars_written:
+                        if not (w_var._name in function.taintList[var._name]):
+                            function.taintList[var._name].append(w_var._name)
+            total_br_taint = []
+            for br_taintList in function.current_br_taint:
+                total_br_taint.extend(br_taintList)
+            for var in node._vars_read:
+                if var._name in total_br_taint:
+                    for w_var in node._vars_written:
+                        if not (w_var._name in function.taintList[var._name]):
+                            function.taintList[var._name].append(w_var._name)
+
+        # main part of taint_analysis
+        stack = []
         for contract in self.contracts:
             for function in contract.functions:
+                # Initialize Source, Sink, taintList of fun;
                 function.setSink()
                 function.setSource()
+                function.setFlag()
+                function.set_br_taint()
                 if function.nodes == []: break
-                node_Num = 0
-                while True:
-                    if (function.nodes[node_Num]._sons == []): break
-                    # do propagation policy
-                    if (hex(function.nodes[node_Num]._node_type)=='0x11'): # return
-                        pass
-                    elif (hex(function.nodes[node_Num]._node_type)=='0x0'): # entry point
-                        pass
-                    elif (hex(function.nodes[node_Num]._node_type) in ['0x10','0x13']): # expression or new variable
-                        for var in function.nodes[node_Num]._vars_read:
-                            if var._name in function.taintList:
-                                # deal with function.nodes[node_Num]._var_written
-                                for w_var in function.nodes[node_Num]._vars_written:
-                                    if not(w_var._name in function.taintList[var._name]):
-                                        function.taintList[var._name].append(w_var._name)
-                    elif (hex(function.nodes[node_Num]._node_type)=='0x40'): # PLACEHOLDER for modifier, _
-                        pass
-                    elif (hex(function.nodes[node_Num]._node_type) == '0x51'): # for loop; 0x15 and 0x52 is included
-                        node_Num = function.nodes[node_Num]._sons[0]._node_id
-                        pass
-                    elif (hex(function.nodes[node_Num]._node_type) in ['0x12','0x15']): # if branch; 0x50 is included
-                        # mark taint
-                        branch_taint =[]
-                        br_node = function.nodes[node_Num]
-                        for var in br_node._vars_read:
-                            if var._name in function.taintList:
-                                branch_taint.append(var._name)
-                        for node in br_node._sons:
-                            if (node._expression == None):
-                                node_Num = node._sons[0]._node_id
-                            else:
-                                for var in node._vars_read:
-                                    if var._name in function.taintList:
-                                        for w_var in br_node._vars_written:
-                                            if not (w_var._name in function.taintList[var._name]):
-                                                function.taintList[var._name].append(w_var._name)
-                                for varName in branch_taint:
-                                    for w_var in br_node._vars_written:
-                                        if not (w_var in function.taintList[varName]):
-                                            function.taintList[varName].append(w_var)
-                    # next node
-                    if len(function.nodes[node_Num]._sons) == 1:
-                        node_Num = function.nodes[node_Num]._sons[0]._node_id
+                # Find the entrance of cfg
+                currentNode = function.nodes[0]
+                while (currentNode._sons):
+                    stack.append(currentNode)
+                    currentNode = propagation(function, stack)
+                while not (stack):
+                    pop_action(function, stack)
 
 
 
