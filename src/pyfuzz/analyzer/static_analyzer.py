@@ -273,13 +273,14 @@ class StaticAnalyzer(IrAnalyzer):
             elif (hex(top._node_type) == '0x50'):
                 while (hex(stack[len(stack) - 1]._node_type) != '0x12'):
                     pop_action(function, stack)
+                nodetypes = [hex(node._node_type) for node in stack]
                 IF_node = stack[len(stack) - 1]
+                pop_action(function, stack)
                 function.current_br_taint.pop()
+                nodetypes = [hex(node._node_type) for node in stack]
                 if (IF_node.flag > 0):
                     return IF_node
-                else:
-                    pop_action(function, stack)
-                    # return top._sons[0]
+                # return top._sons[0]
             # IF_LOOP node
             elif (hex(top._node_type) == '0x15'):
                 top.flag -= 1
