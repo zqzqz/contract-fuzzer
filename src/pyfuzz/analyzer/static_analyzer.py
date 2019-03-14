@@ -324,14 +324,14 @@ class StaticAnalyzer(IrAnalyzer):
                 if function.nodes == []: break
                 # Find the entrance of cfg
                 currentNode = function.nodes[0]
+                stack.append(currentNode)
                 while (currentNode._sons):
-                    stack.append(currentNode)
                     currentNode = propagation(function, stack)
-                while not (stack):
+                    stack.append(currentNode)
+                while (stack):
                     pop_action(function, stack)
 
-
-
+                    
     def run(self, debug=0):
         """
             return an AnalysisReport object, the report has the format:
