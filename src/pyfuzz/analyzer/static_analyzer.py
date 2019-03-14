@@ -274,7 +274,6 @@ class StaticAnalyzer(IrAnalyzer):
                 while (hex(stack[len(stack) - 1]._node_type) != '0x12'):
                     pop_action(function, stack)
                 IF_node = stack[len(stack) - 1]
-                pop_action(function, stack)
                 function.current_br_taint.pop()
                 if (IF_node.flag > 0):
                     return IF_node
