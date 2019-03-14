@@ -298,20 +298,23 @@ class StaticAnalyzer(IrAnalyzer):
 
         def pop_action(function, stack):
             node = stack.pop()
-            for var in node._vars_read:
-                if var._name in function.taintList:
+            # variables read at current node
+            r_vars_name = [r_var._name for r_var in node._vars_read if r_var != None]
+            for var_name in r_vars_name:
+                # Make taint mark of taintList
+                if var_name in function.taintList:
                     for w_var in node._vars_written:
-                        if not (w_var._name in function.taintList[var._name]):
-                            function.taintList[var._name].append(w_var._name)
-            total_br_taint = []
-            for br_taintList in function.current_br_taint:
-                total_br_taint.extend(br_taintList)
-            for var in node._vars_read:
-                if var._name in total_br_taint:
+                        if not (w_var._name in function.taintList[var_name]):
+                            function.taintList[var_name].append(w_var._name)
+                # Make taint mark of branch node_vars
+                total_br_taint = []
+                for br_taintList in function.current_br_taint:
+                    total_br_taint.extend(br_taintList)
+                if var_name in total_br_taint:
                     for w_var in node._vars_written:
-                        if not (w_var._name in function.taintList[var._name]):
-                            function.taintList[var._name].append(w_var._name)
-
+                        if not (w_var._name in function.taintList[var_name]):
+                            function.taintList[var_name].append(w_var._name)
+        
         # main part of taint_analysis
         stack = []
         for contract in self.contracts:
