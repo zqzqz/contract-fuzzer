@@ -331,8 +331,13 @@ class StaticAnalyzer(IrAnalyzer):
                 while (currentNode._sons):
                     currentNode = propagation(function, stack)
                     stack.append(currentNode)
+                    # The following three lines can be used to print
+                    # nodetypes = [hex(node._node_type) for node in stack]
+                    # print('current node is: ',currentNode._expression,'\n','id is: ',currentNode._node_id,' type is : ',hex(currentNode._node_type))
+                    # print('stack info: ', nodetypes)
                 while (stack):
                     pop_action(function, stack)
+                    # To print pop process after traversal of function
 
                     
     def run(self, debug=0):
