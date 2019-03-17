@@ -226,46 +226,49 @@ class StaticAnalyzer(IrAnalyzer):
 
     # add property and method to function object
     def pre_taint(self):
+        '''
+        Source and Sink list contains:
+        function._parameters;
+        function._solidity_vars_read: like msg.sender, msg.value;
+        function._state_vars_read/write: like balance[addr]...;
+        anything to add?
+        '''
+        def setSource(self):
+            para_vars = [p_var for p_var in self._parameters if p_var != None]
+            self.taintSource.extend(para_vars)
+            self.taintSource.extend(self._solidity_vars_read)
+            self.taintSource.extend(self._state_vars_read)
+            for var in self.taintSource:
+                self.taintList[var] = [var]
+
+        def setSink(self):
+            self.taintSink.extend(self._state_vars_written)
+
+        def setFlag(self):
+            for node in self.nodes:
+                if (hex(node._node_type) == '0x50'):
+                    node.flag = 0
+                if (hex(node._node_type) in ['0x12', '0x15']):
+                    node.flag = 2
+
+        def set_br_taint(self):
+            for node in self.nodes:
+                if (hex(node._node_type) in ['0x12', '0x15']):
+                    self.branch_taint[node._node_id] = []
+                    r_vars = [r_var for r_var in node._vars_read if r_var != None]
+                    for var in r_vars:
+                        if var in function.taintList:
+                            self.branch_taint[node._node_id].append(var)
+
+
         for contract in self.contracts:
-            # self means function object
-            def setSource(self):
-                '''
-                :parameter
-                :msg.sender; msg.value
-                '''
-                msg = ['msg.value', 'msg.sender']
-                p_vars = [p_var._name for p_var in self._parameters if p_var != None]
-                for var in p_vars:
-                    self.taintSource.append(var)
-                    self.taintList[var] = [var]
-                for event in msg:
-                    if not (event in self.taintSource):
-                        self.taintSource.append(event)
-                        self.taintList[event] = [event]
-
-            def setSink(self):
-                state_vars = [s_var._name for s_var in self._state_vars_written]
-                for var in state_vars: self.taintSink.append(var)
-                # anything need to add?
-
-            def setFlag(self):
-                for node in self.nodes:
-                    if (hex(node._node_type) == '0x50'):
-                        node.flag = 0
-                    if (hex(node._node_type) in ['0x12', '0x15']):
-                        node.flag = 2
-
-            def set_br_taint(self):
-                for node in self.nodes:
-                    if (hex(node._node_type) in ['0x12', '0x15']):
-                        self.branch_taint[node._node_id] = []
-                        r_vars = [r_var._name for r_var in node._vars_read if r_var != None]
-                        for var_name in r_vars:
-                            if var_name in function.taintList:
-                                self.branch_taint[node._node_id].append(var_name)
-
             for function in contract.functions:
-                # list of variable, add property 'taintMark' list to each variable
+                '''
+                taintList: key<-mark; value<-[v1,v2...]
+                branch_taint: key<-_node_id; value<-[v1,v2...]
+                current_br_taint: means current propagation for branch, 
+                    which consist of branch_taint's value
+                '''
                 function.taintSource = []  # taintMark=None
                 function.taintSink = []
                 function.taintList = {}  # key:mark; value:[v1,v2...]
@@ -312,25 +315,25 @@ class StaticAnalyzer(IrAnalyzer):
                 # return top._sons[0]
             # straight line flow node
             return top._sons[0]
-
+        
         def pop_action(function, stack):
             node = stack.pop()
             # variables read at current node
-            r_vars_name = [r_var._name for r_var in node._vars_read if r_var != None]
-            for var_name in r_vars_name:
+            r_vars = [r_var for r_var in node._vars_read if r_var != None]
+            for var in r_vars:
                 # Make taint mark of taintList
-                if var_name in function.taintList:
+                if var in function.taintList:
                     for w_var in node._vars_written:
-                        if not (w_var._name in function.taintList[var_name]):
-                            function.taintList[var_name].append(w_var._name)
+                        if not (w_var in function.taintList[var]):
+                            function.taintList[var].append(w_var)
                 # Make taint mark of branch node_vars
                 total_br_taint = []
                 for br_taintList in function.current_br_taint:
                     total_br_taint.extend(br_taintList)
-                if var_name in total_br_taint:
+                if var in total_br_taint:
                     for w_var in node._vars_written:
-                        if not (w_var._name in function.taintList[var_name]):
-                            function.taintList[var_name].append(w_var._name)
+                        if not (w_var in function.taintList[var]):
+                            function.taintList[var].append(w_var)
         
         # main part of taint_analysis
         stack = []
