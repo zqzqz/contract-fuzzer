@@ -15,6 +15,7 @@ from pyfuzz.config import *
 
 def deep_q_learning(sess,
                     env,
+                    datadir,
                     q_estimator,
                     target_estimator,
                     num_episodes,
@@ -56,7 +57,7 @@ def deep_q_learning(sess,
         An EpisodeStats object with two numpy arrays for episode_lengths and episode_rewards.
     """
     Transition = namedtuple(
-        "Transition", ["state", "seq_len", "action", "reward", "next_state", "next_seq_len", "done"])
+        "Transition", ["state", "seq_len", "action", "reward", "next_state", "next_seq_len", "contract_file", "done"])
     actionProcessor = ActionProcessor()
     stateProcessor = StateProcessor()
 
@@ -104,16 +105,16 @@ def deep_q_learning(sess,
 
     # Populate the replay memory with initial experience
     print("Populating replay memory...")
-    state, seq_len = env.reset()
+    state, seq_len, filename = env.random_reset(datadir)
     for i in range(replay_memory_init_size):
         action_probs = policy(
             sess, state, epsilons[min(total_t, epsilon_decay_steps-1)], seq_len)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         next_state, next_seq_len, reward, done = env.step(action)
         replay_memory.append(Transition(
-            state, seq_len, action, reward, next_state, next_seq_len, done))
+            state, seq_len, action, reward, next_state, next_seq_len, filename, done))
         if done:
-            state, seq_len = env.reset()
+            state, seq_len, filename = env.random_reset(datadir)
         else:
             state = next_state
             seq_len = next_seq_len
@@ -127,7 +128,7 @@ def deep_q_learning(sess,
         saver.save(tf.get_default_session(), checkpoint_path)
 
         # Reset the environment
-        state , seq_len = env.reset()
+        state, seq_len, filename = env.random_reset(datadir)
         loss = None
 
         # One step in the environment
@@ -158,7 +159,7 @@ def deep_q_learning(sess,
 
             # Save transition to replay memory
             replay_memory.append(Transition(
-                state, seq_len, action, reward, next_state, next_seq_len, done))
+                state, seq_len, action, reward, next_state, next_seq_len, filename, done))
 
             # # Update statistics
             # stats.episode_rewards[i_episode] += reward
@@ -166,7 +167,7 @@ def deep_q_learning(sess,
 
             # Sample a minibatch from the replay memory
             samples = random.sample(replay_memory, batch_size)
-            states_batch, seq_len_batch, action_batch, reward_batch, next_states_batch, next_seq_len_batch, done_batch = map(
+            states_batch, seq_len_batch, action_batch, reward_batch, next_states_batch, next_seq_len_batch, contract_file_batch, done_batch = map(
                 np.array, zip(*samples))
 
             # Calculate q values and targets
@@ -208,7 +209,7 @@ def deep_q_learning(sess,
     return
 
 
-def train():
+def train(datadir):
     print("training the DQN")
 
     # Where we save our checkpoints and graphs
@@ -223,13 +224,12 @@ def train():
     target_estimator = Estimator(scope="target_q")
 
     env = Fuzzer(evmEndPoint=None)
-    filename = os.path.join(DIR_CONFIG["test_contract_dir"], 'Test.sol')
-    env.loadContract(filename, "Test")
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         for t, stats in deep_q_learning(sess,
                                         env,
+                                        datadir,
                                         q_estimator=q_estimator,
                                         target_estimator=target_estimator,
                                         experiment_dir=experiment_dir,

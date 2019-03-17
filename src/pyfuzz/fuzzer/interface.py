@@ -41,9 +41,9 @@ class ContractAbi:
         solcAbi = json.loads(contract["interface"])
         hashes = contract["functionHashes"]
         self.functionHashes = hashes
-
+        # print(hashes, solcAbi)
         for abi in solcAbi:
-            if abi["type"] == "constructor":
+            if abi["type"] != "function":
                 continue
 
             name = abi["name"]
@@ -65,7 +65,7 @@ class ContractAbi:
         args = []
         inputAbi = self.interface[hash]["inputs"]
         for abi in inputAbi:
-            data = self.typeHandler.fuzzByType(abi["type"], SEED_CONFIG["seed_prob"])
+            data = self.typeHandler.fuzzByType(abi["type"], FUZZ_CONFIG["seed_prob"])
             args.append(data)
         return args
 
@@ -74,7 +74,7 @@ class ContractAbi:
         inputAbi = self.interface[hash]["inputs"]
         value = ""
         if self.interface[hash]['payable']:
-            value = self.typeHandler.fuzzByType("payment", SEED_CONFIG["seed_prob"])
+            value = self.typeHandler.fuzzByType("payment", FUZZ_CONFIG["seed_prob"])
         return value
 
     """

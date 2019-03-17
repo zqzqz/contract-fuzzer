@@ -16,10 +16,11 @@ ANALYSIS_CONFIG = {
 
 ANALYSIS_CONFIG["max_length"] = ANALYSIS_CONFIG["max_line_num"] * (ANALYSIS_CONFIG["max_dep_num"] + 3)
 
-TRAIN_CONFIG["max_line_length"] = ANALYSIS_CONFIG["token_size"] * ANALYSIS_CONFIG["max_length"] + 32 * TRAIN_CONFIG["max_func_arg"] + 32 * 2 + 8
+TRAIN_CONFIG["max_line_length"] = ANALYSIS_CONFIG["token_size"] * ANALYSIS_CONFIG["max_length"] + 32 * TRAIN_CONFIG["max_func_arg"] + 32 * 2
 
 FUZZ_CONFIG = {
-    "seed_prob": 0.4
+    "seed_prob": 0.4,
+    "random_action_prob": 0.4
 }
 
 DIR_CONFIG = {}

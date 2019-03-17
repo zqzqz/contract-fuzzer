@@ -91,11 +91,12 @@ class StateProcessor:
             
             txLine = np.array([], dtype=np.uint8)
             if tx.hash not in staticAnalysis.encoded_report:
-                txStatic = "0" * (staticAnalysis.token_size // 4)
-            txStatic = intListToHexString(staticAnalysis.encoded_report[tx.hash], staticAnalysis.token_size)
+                txStatic = "0"
+            else:
+                txStatic = intListToHexString(staticAnalysis.encoded_report[tx.hash], staticAnalysis.token_size)
             txStatic = hexToBinary(txStatic, size=self.seqLen)
             txLine = np.append(txLine, txStatic)
-            txLine = np.append(txLine, hexToBinary(tx.hash, 32))
+            # txLine = np.append(txLine, hexToBinary(tx.hash, 32))
             txLine = np.append(txLine, hexToBinary(valueToHex32(tx.sender), 32))
             txLine = np.append(txLine, hexToBinary(valueToHex32(tx.value), 32))
 
@@ -105,9 +106,10 @@ class StateProcessor:
 
             if txLine.shape[0] < self.sequence.shape[1]:
                 txLine = np.append(txLine, hexToBinary(
-                    "0x00", self.sequence.shape[1] - txLine.shape[0]))
+                    "0x0", self.sequence.shape[1] - txLine.shape[0]))
             elif txLine.shape[0] > self.sequence.shape[1]:
                 txLine = txLine[:self.sequence.shape[1]]
+            # print(self.sequence.shape, np.expand_dims(txLine, axis=0).shape, txLine.shape)
             self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
 
         while self.sequence.shape[0] < self.maxFuncNum + 1:
@@ -124,7 +126,7 @@ class StateProcessor:
             self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
         
         self.sequence = self.sequence[1:]
-        self.sequence = np.expand_dims(self.sequence, axis=0)
+        self.sequence = np.expand_dims(self.sequence, axis=2)
         return self.sequence, self.txNum
 
     def decodeState(self, state):

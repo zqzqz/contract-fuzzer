@@ -20,4 +20,5 @@ if __name__ == '__main__':
 
     state = State(report, [Transaction(list(report.func_map.keys())[0], [12345], "121212121212121212121212", "123123123123", {"inputs": [{"type": "uint256"}]})])
     state, seqLen = stateProcessor.encodeState(state)
-    print("state", state)
+    print("state", state.shape)
+    print(state)

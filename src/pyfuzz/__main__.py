@@ -1,11 +1,12 @@
 from pyfuzz.fuzzer.fuzzer import Fuzzer
 from pyfuzz.trainer.model import *
-from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG
+from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
 from pyfuzz.trainer.train import train
 import numpy as np
 import argparse
+import logging
 
-def fuzz():
+def fuzz(datadir):
     print("fuzzing the contracts")
 
     # Where we save our checkpoints and graphs
@@ -13,8 +14,6 @@ def fuzz():
 
     # initialize fuzzer framework
     env = Fuzzer(evmEndPoint=None)
-    filename = os.path.join(DIR_CONFIG["test_contract_dir"], 'Test.sol')
-    env.loadContract(filename, "Test")
 
     # Create estimators
     actionProcessor = ActionProcessor(env.maxFuncNum, env.maxCallNum)
@@ -26,12 +25,12 @@ def fuzz():
     checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
     checkpoint_path = os.path.join(checkpoint_dir, "model.meta")
 
+    rand_prob = FUZZ_CONFIG["random_action_prob"]
+
     with tf.Session() as sess:
         # First let's load meta graph and restore weights
         saver = tf.train.import_meta_graph(checkpoint_path)
         saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
-
-        state, seq_len = env.reset()
 
         graph = tf.get_default_graph()
         predictions = graph.get_tensor_by_name(
@@ -40,34 +39,44 @@ def fuzz():
         real_seq_length = graph.get_tensor_by_name(
             "q_estimator/real_seq_length:0")
 
-        epsilon = 0.5
-        while True:
-            feed_dict = {X: np.expand_dims(
-                state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
-            q_values = sess.run(predictions, feed_dict)[0]
-            action_probs = np.ones(
-                actionProcessor.actionNum, dtype=float) * epsilon / actionProcessor.actionNum
-            best_action = np.argmax(q_values)
-            action_probs[best_action] += (1.0 - epsilon)
-            action = np.random.choice(
-                np.arange(len(action_probs)), p=action_probs)
-            state, seq_len, reward, done = env.step(action)
+        contract_files = os.listdir(datadir)
+        for filename in contract_files:
+            full_filename = os.path.join(datadir, filename)
+            contract_name = filename.split('.')[0].split("#")[1]
+            env.loadContract(full_filename, contract_name)
 
-            if done:
-                break
+            state, seq_len = env.reset()
+            while True:
+                feed_dict = {X: np.expand_dims(
+                    state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
+                q_values = sess.run(predictions, feed_dict)[0]
+                action_probs = np.ones(
+                    actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
+                best_action = np.argmax(q_values)
+                action_probs[best_action] += (1.0 - rand_prob)
+                action = np.random.choice(
+                    np.arange(len(action_probs)), p=action_probs)
+                state, seq_len, reward, done = env.step(action)
+
+                if done:
+                    break
 
 
 def main():
     parser = argparse.ArgumentParser(description='Contract fuzzer')
-    parser.add_argument('--train', dest='train_mode', action='store_const',
+    parser.add_argument('--train', action='store_const',
                         const=1, default=0,
                         help='train q estimator for DQN in the fuzzer')
+    parser.add_argument("--datadir", help="directory containing contract source files")
 
     args = parser.parse_args()
-    if args.train_mode:
-        train()
+    if not os.path.isdir(args.datadir):
+        logging.error("wrong datadir")
+        exit(1)
+    if args.train:
+        train(args.datadir)
     else:
-        fuzz()
+        fuzz(args.datadir)
 
 if __name__ == '__main__':
     main()

@@ -6,8 +6,9 @@ from pyfuzz.analyzer.static_analyzer import *
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG
 
 import logging
-from random import randint
+from random import randint, choice
 import json
+import os
 
 class Fuzzer():
     def __init__(self, evmEndPoint=None):
@@ -16,34 +17,56 @@ class Fuzzer():
         else:
             self.evm = EvmHandler()
         self.contract = None
-        self.contractAddress = None
         self.contractAbi = None
+        self.contractAnalysisReport = None
+        # contract cache. Each element is a dict {"contract", "abi", "report"}
+        self.contractMap = {}
+        self.contractAddress = None
+        # current state
         self.state = None
         self.seqLen = None
+        # configurations
         self.maxFuncNum = TRAIN_CONFIG["max_func_num"]
         self.maxCallNum = TRAIN_CONFIG["max_call_num"]
         self.actionNum = TRAIN_CONFIG["action_num"]
+        # state and action processor
         self.stateProcessor = StateProcessor()
         self.actionProcessor = ActionProcessor()
+        # execution results
         self.traces = []
         self.reports = []
+        # eth accounts
         self.accounts = self.evm.getAccounts()
         self.defaultAccount = list(self.accounts.keys())[1]
-        with open(os.path.join(DIR_CONFIG["seed_dir"], 'address.json'), 'w') as f:
-            json.dump(list(self.accounts.keys()), f, indent="\t")
+        # analyzers
         self.traceAnalyzer = TraceAnalyzer()
         self.staticAnalyzer = StaticAnalyzer()
+        # for test
         self.counter = 0
+        # eth accounts as seeds of type address
+        with open(os.path.join(DIR_CONFIG["seed_dir"], 'address.json'), 'w') as f:
+            json.dump(list(self.accounts.keys()), f, indent="\t")
 
     def loadContract(self, filename, contract_name):
-        with open(filename, "r") as f:
-            source = f.read()
-        self.contract = self.evm.compile(source, contract_name)
-        # self.contractAddress = self.evm.deploy(self.contract)
-        self.contractAbi = ContractAbi(self.contract)
-        # run static analysis
-        self.staticAnalyzer.load_contract(filename, contract_name)
-        self.staticAnalyzer.run()
+        if filename in self.contractMap:
+            # the contract is in cache
+            self.contract = self.contractMap[filename]["contract"]
+            self.contractAbi = self.contractMap[filename]["abi"]
+            self.analysisAnalysisReport = self.contractMap[filename]["report"]
+        else:
+            with open(filename, "r") as f:
+                source = f.read()
+            self.contract = self.evm.compile(source, contract_name)
+            self.contractAbi = ContractAbi(self.contract)
+            # run static analysis
+            self.staticAnalyzer.load_contract(filename, contract_name)
+            self.contractAnalysisReport = self.staticAnalyzer.run()
+            # set cache
+            self.contractMap[filename] = {
+                "contract": self.contract,
+                "abi": self.contractAbi,
+                "report": self.contractAnalysisReport
+            }
 
     def runOneTx(self, tx):
         if self.contract == None:
@@ -60,7 +83,6 @@ class Fuzzer():
         return traces
 
     def reward(self, traces):
-        self.counter += 1
         report, reward = self.traceAnalyzer.run(self.traces, traces)
 
         self.accounts_p = self.accounts
@@ -147,7 +169,7 @@ class Fuzzer():
             return
         self.contractAddress = self.evm.deploy(self.contract)
         # todo
-        self.state = State(self.staticAnalyzer.report, [])
+        self.state = State(self.contractAnalysisReport, [])
         self.traces = []
         self.reports = []
         # randomFuncIndex = randint(0, len(self.contractAbi.funcHashList)-1)
@@ -155,8 +177,22 @@ class Fuzzer():
         state, seqLen = self.stateProcessor.encodeState(self.state)
         return state, seqLen
 
+    def random_reset(self, datadir):
+        contract_files = os.listdir(datadir)
+        filename = choice(contract_files)
+        state, seqLen = self.contract_reset(datadir, filename)
+        return state, seqLen, filename
+
+    def contract_reset(self, datadir, filename):
+        assert(filename != None)
+        full_filename = os.path.join(datadir, filename)
+        contract_name = filename.split('.')[0].split("#")[1]
+        self.loadContract(full_filename, contract_name)
+        return self.reset()
+
     def step(self, action):
         done = 0
+        self.counter += 1
         action = self.actionProcessor.decodeAction(action)
         nextState = self.mutate(self.state, action)
         if not nextState:
