@@ -71,6 +71,23 @@ class StaticAnalyzer(IrAnalyzer):
     @staticmethod
     def _parse_function_for_report(function):
         function.report = []
+        sink_taint = []
+        taint_report = []
+        for source in function.taintSource:
+            sink_taint.extend([var_name for var_name in function.taintList[source] if (not(var_name in function.taintSource))
+                               and (not(var_name in sink_taint))])
+        for var_name in sink_taint:
+            taint_report.append({
+                "var": var_name,
+                "op": "taint",
+                "deps": []
+            })
+            for source in function.taintSource:
+                if var_name in function.taintList[source]:
+                    taint_report[len(function.report) - 1]["deps"].append(source)
+        for report_line in taint_report:
+            report_line["func"] = function.name
+        # taint_report is in the same format as node report
         for node in function.nodes:
             if not node.report:
                 continue
