@@ -4,7 +4,7 @@ from pyfuzz.trainer.model import *
 from pyfuzz.analyzer.static_analyzer import *
 from pyfuzz.fuzzer.interface import Transaction
 
-if __name__ == '__main__':
+def test():
     actionProcessor = ActionProcessor()
     stateProcessor = StateProcessor()
     
@@ -22,3 +22,6 @@ if __name__ == '__main__':
     state, seqLen = stateProcessor.encodeState(state)
     print("state", state.shape)
     print(state)
+    
+if __name__ == '__main__':
+    test()
