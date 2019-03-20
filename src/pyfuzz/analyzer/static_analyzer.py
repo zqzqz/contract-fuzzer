@@ -3,6 +3,7 @@ from pyfuzz.config import ANALYSIS_CONFIG
 import logging
 import eth_utils
 from types import MethodType
+import slither
 
 def print_reports(reports):
     if isinstance(reports, list):
@@ -84,6 +85,42 @@ class StaticAnalyzer(IrAnalyzer):
             for source in function.taintSource:
                 if var in function.taintList[source]:
                     function.report[len(function.report) - 1]["deps"].append(source)
+        
+        '''
+        add external_calls into report
+        here only consider about send and transfer with certain format args
+        '''
+        for ex_call in function._external_calls_as_expressions:
+            try:
+                op = ex_call.called.member_name
+                if op in ["transfer","send"]:
+                    _to = ex_call.called.expression.value # address, like msg.sender
+                    # format like: msg.sender.transfer(payments[msg.sender]);
+                    if (type(ex_call.arguments[0])==slither.core.expressions.index_access.IndexAccess):
+                        index_left = ex_call.arguments[0].expression_left.value  # state value
+                        index_right = ex_call.arguments[0].expression_right.value  # state value
+                        function.report.append({
+                            "var": _to,
+                            "op": op,
+                            "deps":[index_left,index_right]
+                        })
+                        for var in [index_left,index_right]:
+                            for source in function.taintSource:
+                                if var in function.taintList[source]:
+                                    if not(source in function.report[len(function.report) - 1]["deps"]):
+                                        function.report[len(function.report) - 1]["deps"].append(source)
+                    else: # format like: msg.sender.transfer(msg.value)
+                        function.report.append({
+                            "var": _to,
+                            "op": op,
+                            "deps":[ex_call.arguments[0].value]
+                        })
+                        for source in function.taintSource:
+                            if ex_call.arguments[0].value in function.taintList[source]:
+                                if not (source in function.report[len(function.report) - 1]["deps"]):
+                                    function.report[len(function.report) - 1]["deps"].append(source)
+            except: continue
+            else: pass
         for report_line in function.report:
             report_line["func"] = function
         return function.report
@@ -220,10 +257,10 @@ class StaticAnalyzer(IrAnalyzer):
     def pre_taint(self):
         '''
         Source and Sink list contains:
-        function._parameters;
-        function._solidity_vars_read: like msg.sender, msg.value;
-        function._state_vars_read/write: like balance[addr]...;
-        anything to add?
+        1. function._parameters;
+        2. function._solidity_vars_read: like msg.sender, msg.value; in the following url:
+                https://github.com/crytic/slither/blob/master/slither/core/declarations/solidity_variables.py
+        3. function._state_vars_read/write: like balance[addr]..., they are declared in current contract
         '''
         def setSource(self):
             para_vars = [p_var for p_var in self._parameters if p_var != None]
