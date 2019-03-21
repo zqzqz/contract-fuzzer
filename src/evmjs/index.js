@@ -4,7 +4,9 @@ const protoLoader = require('@grpc/proto-loader');
 const PROTO_PATH = path.join(__dirname, '../static/evm.proto');
 
 let evmHandler = require('./EVMHandler');
-evmHandler.init();
+evmHandler.init().then(() => {
+  console.log("initVM success");
+})
 
 // Suggested options for similarity to existing grpc.load behavior
 let packageDefinition = protoLoader.loadSync(
@@ -20,8 +22,10 @@ let protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
 let evm = protoDescriptor.evm;
 
 function resetWrapper(status) {
-  evmHandler.init();
-  return { option: status.option }
+  evmHandler.init().then((res) => {
+    call.write({ option: status.option });
+    call.end()
+  })
 }
 
 async function getAccountsWrapper(call) {
@@ -56,7 +60,7 @@ async function deployWrapper(call) {
     contract = JSON.parse(call.request.data);
     let res = await evmHandler.deploy(contract)
     call.write({
-      address: res.tx.contractAddress
+      address: res.createdAddress.toString("hex")
     });
     call.end();
   } catch (err) {

@@ -1,6 +1,7 @@
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 from pyfuzz.evm import EvmHandler
+from pyfuzz.fuzzer.interface import Transaction
 
 def test():
     evm = EvmHandler()
@@ -18,9 +19,17 @@ def test():
     address = evm.deploy(contract)
     print(address)
     print("\nTesting sendTx\n")
-    trace = evm.sendTx(list(accounts.keys())[0], address, "0", contract["functionHashes"]["test2()"])
+    trace = evm.sendTx(list(accounts.keys())[0], address, "0", contract["functionHashes"]["test1(uint256)"] + "0" * 32)
     for t in trace:
         print(t["op"], end=" ")
+    print()
+    trace = evm.sendTx(list(accounts.keys())[0], address, "0", contract["functionHashes"]["TimestampDependency()"])
+    for t in trace:
+        print(t["op"], end=" ")
+    print("\nTesting getAccounts:\n")
+    accounts = evm.getAccounts()
+    print(accounts)
+    
 
 if __name__ == "__main__":
     test()

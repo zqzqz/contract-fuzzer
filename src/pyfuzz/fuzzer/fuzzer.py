@@ -73,7 +73,7 @@ class Fuzzer():
             logging.error("Contract have not been loaded.")
             return None
         trace = self.evm.sendTx(tx.sender, self.contractAddress,
-                                tx.value, tx.payload)
+                                str(tx.value), tx.payload)
         return trace
 
     def runTxs(self, txList):
@@ -168,7 +168,9 @@ class Fuzzer():
             logging.error("Contract not inintialized in fuzzer.")
             return
         self.contractAddress = self.evm.deploy(self.contract)
-        # todo
+        # todo: whether this transfer must be successful?
+        trace = self.evm.sendTx(self.defaultAccount, self.contractAddress, "0xffffffff", "")
+
         self.state = State(self.contractAnalysisReport, [])
         self.traces = []
         self.reports = []

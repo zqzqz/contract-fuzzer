@@ -9,6 +9,8 @@ const BN = require('ethereumjs-util').BN
 const remixLib = require('remix-lib')
 const Debugger = require('remix-debug').EthDebugger
 const async = require('async')
+const Trie = require('merkle-patricia-tree')
+const Account = require('ethereumjs-account')
 
 privateKeys = [
   Buffer.from('c87509a1c067bbde78beb793e6fa76530b6382a4c0241e5e4a9ec0a0f44dc0d3', 'hex'),
@@ -28,6 +30,7 @@ EVMHandler = {
   debugger: null,
   // virtual machine implemented by js
   vm: null,
+  stateTrie: null,
   // web3 object corresponding to vm
   web3vm: null,
   // a map from address to private keys
@@ -40,53 +43,62 @@ EVMHandler = {
   t: 12,
 
   init: () => {
-    EVMHandler.accounts = {}
-    EVMHandler.contracts = {}
-    EVMHandler.vm = EVMHandler.initVM()
-    EVMHandler.web3vm = new remixLib.vm.Web3VMProvider()
-    EVMHandler.web3vm.setVM(EVMHandler.vm)
-    EVMHandler.debugger = new Debugger({
-      web3: EVMHandler.web3vm,
-      compilationResult: function () {
-        return true;
-      }
-    })
-    // EVMHandler.debugger.addProvider('web3vmprovider', EVMHandler.web3VM)
-    // EVMHandler.debugger.switchProvider('web3vmprovider')
+    return new Promise((resolve, reject) => {
+      EVMHandler.accounts = {}
+      EVMHandler.contracts = {}
+      EVMHandler.initVM().then((vm) => {
+        EVMHandler.vm = vm;
+        EVMHandler.web3vm = new remixLib.vm.Web3VMProvider()
+        EVMHandler.web3vm.setVM(EVMHandler.vm)
+        EVMHandler.debugger = new Debugger({
+          web3: EVMHandler.web3vm,
+          compilationResult: function () {
+            return true
+          }
+        })
+        resolve();
+      })
+    });
   },
 
   initVM: () => {
-    let utileth = require('ethereumjs-util')
-    let VM = require('ethereumjs-vm')
-    let Web3Providers = remixLib.vm.Web3Providers
-    let vm = new VM({
-      enableHomestead: true,
-      activatePrecompiles: true
-    })
-    EVMHandler.accounts = [];
-    for (let i in privateKeys) {
-      let address = utileth.privateToAddress(privateKeys[i])
-      vm.stateManager.putAccountBalance(address, '0xffffffffffffffffffffffff', function cb () {})
-      EVMHandler.accounts[utileth.bufferToHex(address)] = privateKeys[i].toString('hex');
-      if (i == 0) {
-        EVMHandler.defaultAccount = utileth.bufferToHex(address);
-      }
-    }
-    let web3Providers = new Web3Providers()
-    web3Providers.addVM('VM', vm)
-    web3Providers.get('VM', function (error, obj) {
-      if (error) {
-        let mes = 'provider TEST not defined'
-        console.log(mes)
-        st.fail(mes)
-      } else {
-        vm.web3 = obj
-      }
-    })
-    return vm
+    return new Promise((resolve, reject) => {
+      let utileth = require('ethereumjs-util')
+      let VM = require('ethereumjs-vm')
+      EVMHandler.stateTrie = new Trie()
+      let vm = new VM({
+        state: EVMHandler.stateTrie
+      })
+      EVMHandler.accounts = [];
+      async.eachSeries(privateKeys, (privateKey, next) => {
+        let address = utileth.privateToAddress(privateKey)
+        EVMHandler.accounts[utileth.bufferToHex(address).replace("0x", "")] = privateKey.toString('hex');
+        if (!EVMHandler.defaultAccount) {
+          EVMHandler.defaultAccount = utileth.bufferToHex(address).replace("0x", "");
+        }
+        // set balance for each account
+        let account = new Account();
+        account.balance = "0xffffffffffffffffffffffff"
+        EVMHandler.stateTrie.put(address, account.serialize(), () => {
+          next();
+        })
+        // // use putAccountBalance ? failed
+        // vm.stateManager.putAccountBalance(address, new BN("ffffffffffffffffffffffff", 16), function cb () { next() })
+        // // use putAccount & getAccount ? failed
+        // vm.stateManager.getAccount(address, (res, account) => {
+        //   account.balance = "0xffffffffffffffffffffffff";
+        //   vm.stateManager.putAccount(address, account, () => {
+        //     next();
+        //   })
+        // })
+      }, (err) => {
+        // nothing;
+      })
+      resolve(vm);
+    });
   },
 
-    // compile a contract source to a contract object
+  // compile a contract source to a contract object
   compile: (source, name) => {
     let filename = "filename";
     let output = solc.compile({ 'sources': { filename: source } }, 1);
@@ -99,15 +111,15 @@ EVMHandler = {
     return new Promise((resolve, reject) => {
       let accList = Object.keys(EVMHandler.accounts);
       let accountsWithBalance = {};
-      async.eachSeries(accList, (acc, next) => {
+      async.eachSeries(accList, (addressHex, next) => {
         // acc = Buffer.from(acc, "hex")
-        if (utileth.isHexPrefixed(acc)) {
-          acc = acc.replace("0x", "")
+        if (utileth.isHexPrefixed(addressHex)) {
+          addressHex = addressHex.replace("0x", "")
         }
-        accBuf = Buffer.from(acc, "hex")
-        EVMHandler.vm.stateManager.getAccountBalance(accBuf, (err, balance) => {
+        let address = Buffer.from(addressHex, "hex")
+        EVMHandler.vm.stateManager.getAccount(address, (err, account) => {
           if (err) reject(err);
-          accountsWithBalance["0x" + acc] = utileth.bufferToHex(balance);
+          accountsWithBalance[addressHex] = utileth.bufferToHex(account.balance);
           next();
         })
       }, (err) => {
@@ -120,39 +132,52 @@ EVMHandler = {
   deploy: (contract) => {
     return new Promise((resolve, reject) => {
       let accs = Object.keys(EVMHandler.accounts)
-      EVMHandler.sendTx(EVMHandler.defaultAccount, "", 0, contract.bytecode).then((result) => {
-        if (!result.tx.contractAddress) reject(Error("Invalid contract address"));
-        EVMHandler.contracts[result.tx.contractAddress] = contract;
-        resolve(result);
+      EVMHandler.sendTx(EVMHandler.defaultAccount, "", "0", contract.bytecode).then((result) => {
+        if (!result.createdAddress) reject(Error("Invalid contract address"));
+        let contractAddress = result.createdAddress.toString("hex")
+        EVMHandler.contracts[contractAddress] = contract;
+        // init balance for newly deployed contracts
+        let account = EVMHandler.stateTrie.get(result.createdAddress, (err, accData) => {
+          let account = new Account(accData);
+          account.balance = "0xffffffffffffffffffffffff";
+          EVMHandler.stateTrie.put(result.createdAddress, account.serialize(), () => {
+            resolve(result);
+          })
+        });
+        // EVMHandler.vm.stateManager.getAccount(result.createdAddress, (err, account) => {
+        //   account.balance = "0xffffffffffffffffffffffff";
+        //   EVMHandler.vm.stateManager.putAccount(contractAddress, account, () => {
+        //     resolve(result);
+        //   })
+        // })
       }).catch((err) => {
         reject(err)
       })
-    });
+    })
   },
 
-  debug: (tx) => {
+  debug: (txhash) => {
     return new Promise((resolve, reject) => {
-      EVMHandler.debugger.debug(tx);
+      EVMHandler.debugger.debug(txhash);
       resolve(EVMHandler.debugger.traceManager.trace)
-      // EVMHandler.debugger.event.register('newTraceLoaded', () => {
-      //   // start doing basic stuff like retrieving step details
-      //   EVMHandler.debugger.traceManager.getCallStackAt(34, (error, callstack) => {})
-      // })
     });
   },
 
   // send a raw transaction
   sendTx: (from, to, value, data) => {
     return new Promise((resolve, reject) => {
-      data = data.replace("0x", "")
-      let tx = new Tx({
+
+      let opts = {
         nonce: new BN(from.nonce++),
         gasPrice: new BN(1),
         gasLimit: new BN(3000000, 10),
-        to: to,
-        value: new BN(value, 10),
-        data: Buffer.from(data, 'hex')
-      })
+        from: Buffer.from(from.replace("0x", ""), 'hex'),
+        to: Buffer.from(to.replace("0x", ""), 'hex'),
+        value: new BN(parseInt(value, 10), 10),
+        data: Buffer.from(data.replace("0x", ""), 'hex')
+      }
+      let tx = new Tx(opts)
+
       tx.sign(Buffer.from(EVMHandler.accounts[from], 'hex'));
       let block = new Block({
         header: {
@@ -162,14 +187,18 @@ EVMHandler = {
         transactions: [],
         uncleHeaders: []
       })
-      EVMHandler.vm.runTx({block: block, tx: tx, skipBalance: true, skipNonce: true}, function (error, result) {
-        if (error) reject(error)
+      EVMHandler.vm.runTx({block: block, tx: tx, skipBalance: false, skipNonce: true}, function (error, result) {
+        if (error || result == null || result === undefined) {
+          reject(error);
+        }
         txHash = utileth.bufferToHex(tx.hash());
+        // resolve(result)
         EVMHandler.web3vm.eth.getTransaction(txHash, (err, evmTx) => {
           if (err) {
             reject(err);
           } else {
-            resolve({tx: evmTx, res: result});
+            if (result == null || result === undefined) reject(null)
+            else { result.tx = evmTx; resolve(result); }
           }
         })
       })
