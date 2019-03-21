@@ -22,14 +22,9 @@ def test():
     trace = evm.sendTx(list(accounts.keys())[0], address, "0", contract["functionHashes"]["test1(uint256)"] + "0" * 32)
     for t in trace:
         print(t["op"], end=" ")
-    print()
-    trace = evm.sendTx(list(accounts.keys())[0], address, "0", contract["functionHashes"]["TimestampDependency()"])
-    for t in trace:
-        print(t["op"], end=" ")
     print("\nTesting getAccounts:\n")
     accounts = evm.getAccounts()
     print(accounts)
-    
 
 if __name__ == "__main__":
     test()

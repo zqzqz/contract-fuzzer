@@ -18,8 +18,4 @@ contract Test {
         uint value = block.timestamp % 1000;
         msg.sender.transfer(value);
     }
-
-    // function () payable public {
-
-    // }
 }
