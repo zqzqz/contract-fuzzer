@@ -1,8 +1,9 @@
+from pyfuzz.fuzzer.detector.detector import Detector
 import logging
 
 class TraceAnalyzer:
     def __init__(self):
-        pass
+        self.detector = Detector()
 
     """
         input:
@@ -13,8 +14,9 @@ class TraceAnalyzer:
           reward (int): calculated reward
     """
     def run(self, ptraces, ctraces):
-        report = []
+        report = self.detector.run(ctraces)
         reward = self.path_variaty(ptraces, ctraces)
+        # todo: assign rewards according to reports
         return report, reward
 
     def path_variaty(self, ptraces, ctraces):

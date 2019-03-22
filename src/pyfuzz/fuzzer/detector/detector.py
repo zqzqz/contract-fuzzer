@@ -36,12 +36,17 @@ class Detector():
         self.detectors = {
             "TimestampDependency": self.timestamp_dependency_detector,
             "BlockNumberDependency": self.block_number_dependency_detector,
+            "UnhandledException": self.unhandled_exception_detector,
+            "Reentrancy": self.reentrancy_detector
         }
         self.oracles = {
             "TimestampOp": TimestampOpOracle(),
             "BlockNumOp": BlockNumOpOracle(),
             "EtherTransfer": EtherTransferOracle(),
-            "SendCall": SendCallOracle()
+            "SendCall": SendCallOracle(),
+            "Exception": ExceptionOracle(),
+            "Revert": RevertOracle(),
+            "Reentrancy": ReentrancyOracle()
         }
         for det in opts:
             if det in self.detectors and opts[det] == False:
@@ -71,51 +76,50 @@ class Detector():
         return list(set(vulnerabilities))
 
     def timestamp_dependency_detector(self):
-        timestamp_op_flag = False
-        pc = None
         vulnerabilities = []
-        
-        for res in self.oracles["TimestampOp"].results:
-            if not timestamp_op_flag:
-                timestamp_op_flag = True
-            if not pc:
-                pc = res.pc
-        
+        timestamp_op_flag = self.oracles["TimestampOp"].triggered
         if not timestamp_op_flag:
             return vulnerabilities
+        pcs = self.oracles["TimestampOp"].pcs
 
-        send_call_pcs = []
-        ether_transfer_pcs = []
-        for res in self.oracles["SendCall"].results:
-            send_call_pcs.append(res.pc)
-        for res in self.oracles["EtherTransfer"].results:
-            ether_transfer_pcs.append(res.pc)
+        send_call_pcs = self.oracles["SendCall"].pcs
+        ether_transfer_pcs = self.oracles["EtherTransfer"].pcs
         critical_call_pcs = list(set(send_call_pcs).intersection(ether_transfer_pcs))
         if len(critical_call_pcs) > 0:
-            vulnerabilities.append(Vulnerability("TimestampDependency", pc))
+            for pc in pcs:
+                vulnerabilities.append(Vulnerability("TimestampDependency", pc))
         return vulnerabilities
 
     def block_number_dependency_detector(self):
-        block_number_op_flag = False
-        pc = None
         vulnerabilities = []
-        
-        for res in self.oracles["BlockNumOp"].results:
-            if not block_number_op_flag:
-                block_number_op_flag = True
-            if not pc:
-                pc = res.pc
-        
+        block_number_op_flag = self.oracles["BlockNumOp"].triggered
         if not block_number_op_flag:
             return vulnerabilities
+        pcs = self.oracles["BlockNumOp"].pcs
 
-        send_call_pcs = []
-        ether_transfer_pcs = []
-        for res in self.oracles["SendCall"].results:
-            send_call_pcs.append(res.pc)
-        for res in self.oracles["EtherTransfer"].results:
-            ether_transfer_pcs.append(res.pc)
+        send_call_pcs = self.oracles["SendCall"].pcs
+        ether_transfer_pcs = self.oracles["EtherTransfer"].pcs
         critical_call_pcs = list(set(send_call_pcs).intersection(ether_transfer_pcs))
         if len(critical_call_pcs) > 0:
-            vulnerabilities.append(Vulnerability("BlockNumberDependency", pc))
+            for pc in pcs:
+                vulnerabilities.append(Vulnerability("BlockNumberDependency", pc))
+        return vulnerabilities
+
+    def unhandled_exception_detector(self):
+        vulnerabilities = []
+        revert_flag = self.oracles["Revert"].triggered
+        if revert_flag:
+            return vulnerabilities
+        exception_flag = self.oracles["Exception"].triggered
+        if exception_flag:
+            for pc in self.oracles["Exception"].pcs:
+                vulnerabilities.append(Vulnerability("UnhandledException", pc))
+        return vulnerabilities
+
+    def reentrancy_detector(self):
+        vulnerabilities = []
+        reentrancy_flag = self.oracles["Reentrancy"].triggered
+        if reentrancy_flag:
+            for pc in self.oracles["Reentrancy"].pcs:
+                vulnerabilities.append(Vulnerability("Reentrancy", pc))
         return vulnerabilities

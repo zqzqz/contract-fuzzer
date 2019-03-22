@@ -5,36 +5,20 @@ from pyfuzz.fuzzer.interface import Transaction
 from pyfuzz.fuzzer.detector.detector import Detector, Vulnerability
 import json
 
-def timestamp_dependency():
-    evm = EvmHandler()
-    with open(os.path.join(os.path.dirname(__file__), '../test/contracts/TimestampDependency.sol'), 'r') as f:
-        text = f.read()
-    accounts = evm.getAccounts()
-    contract = evm.compile(text, "Test")
-    address = evm.deploy(contract)
-    trace = evm.sendTx(list(accounts.keys())[1], address, "0", contract["functionHashes"]["TimestampDependency()"])
-    for t in trace:
-        print(t["op"], end=" ")
-    print()
-    # with open(os.path.join(os.path.dirname(__file__), '../test/contracts/TimestampDependencyTrace.json'), 'w') as f:
-    #     json.dump(trace, f, indent=4)
-    detector = Detector()
-    vulns = detector.run([trace])
-    for vuln in vulns:
-        print(str(vuln))
+evm = EvmHandler()
 
-def block_number_dependency():
-    evm = EvmHandler()
-    with open(os.path.join(os.path.dirname(__file__), '../test/contracts/BlockNumberDependency.sol'), 'r') as f:
+def test_vulnerability(name):
+    print("Testing", name)
+    with open(os.path.join(os.path.dirname(__file__), '../test/contracts/'+name+'.sol'), 'r') as f:
         text = f.read()
     accounts = evm.getAccounts()
     contract = evm.compile(text, "Test")
     address = evm.deploy(contract)
-    trace = evm.sendTx(list(accounts.keys())[1], address, "0", contract["functionHashes"]["BlockNumberDependency()"])
+    trace = evm.sendTx(list(accounts.keys())[1], address, "0", contract["functionHashes"][name+"()"])
     for t in trace:
         print(t["op"], end=" ")
     print()
-    with open(os.path.join(os.path.dirname(__file__), '../test/contracts/BlockNumberDependencyTrace.json'), 'w') as f:
+    with open(os.path.join(os.path.dirname(__file__), '../test/contracts/'+name+'Trace.json'), 'w') as f:
         json.dump(trace, f, indent=4)
     detector = Detector()
     vulns = detector.run([trace])
@@ -42,5 +26,7 @@ def block_number_dependency():
         print(str(vuln))
 
 if __name__ == "__main__":
-    timestamp_dependency()
-    block_number_dependency()
+    test_vulnerability("TimestampDependency")
+    test_vulnerability("BlockNumberDependency")
+    test_vulnerability("UnhandledException")
+    test_vulnerability("Reentrancy")

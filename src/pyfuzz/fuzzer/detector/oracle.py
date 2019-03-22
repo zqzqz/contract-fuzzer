@@ -31,6 +31,14 @@ class Oracle():
     def reset(self):
         self.results = []
 
+    @property
+    def triggered(self):
+        return len(self.results) > 0
+
+    @property
+    def pcs(self):
+        return [res.pc for res in self.results]
+
     @abstractmethod
     def run_step(self, step):
         pass
@@ -91,3 +99,52 @@ class SendCallOracle(Oracle):
             input_len = stack[-5]
             if int(input_len, 16) == 0 and address[-40:] in self.accounts and int(gas, 16) == 2300:
                 self.results.append(OracleReport(self.name, 1, step["pc"]))
+
+
+class ExceptionOracle(Oracle):
+    def __init__(self):
+        super().__init__("Exception")
+        self.call_pc = -2
+
+    def run_step(self, step):
+        if step["op"] == "CALL":
+            self.call_pc = step["pc"]
+        if step["pc"] == self.call_pc + 1:
+            if int(step["stack"][-1], 16) == 0:
+                self.results.append(OracleReport(self.name, 1, self.call_pc))
+
+
+class RevertOracle(Oracle):
+    def __init__(self):
+        super().__init__("Revert")
+
+    def run_step(self, step):
+        if step["op"] == "REVERT":
+            self.results.append(OracleReport(self.name, 1, step["pc"]))
+
+
+class ReentrancyOracle(Oracle):
+    def __init__(self):
+        super().__init__("Reentrancy")
+        self.accounts = []
+        seed_dir = DIR_CONFIG["seed_dir"]
+        json_file = os.path.join(seed_dir, "address.json")
+        if os.path.isfile(json_file):
+            with open(json_file, "r") as f:
+                self.accounts = list(json.load(f))
+        self.call_pc = -1
+    
+    def run_step(self, step):
+        if self.call_pc <= 0 and step["op"] == "CALL":
+            stack = step["stack"]
+            gas = stack[-1]
+            address = stack[-2]
+            # is it necessary to have value > 0?
+            value = stack[-3]
+
+            if int(gas, 16) != 2300 and address[-40:] in self.accounts:
+                self.call_pc = step["pc"]
+        
+        if self.call_pc > 0 and step["op"] == "SSTORE":
+            self.results.append(OracleReport(self.name, 1, self.call_pc))
+            self.call_pc = -1
