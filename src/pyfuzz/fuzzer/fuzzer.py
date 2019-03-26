@@ -125,7 +125,6 @@ class Fuzzer():
         txList = state.txList + []
         actionId = action.actionId
         actionArg = action.actionArg
-        print("action", actionId, actionArg)
         if actionId >= 0 and actionId < 2:
             # insert
             if actionArg < 0 or actionArg >= len(self.contractAbi.funcHashList):
