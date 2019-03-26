@@ -13,9 +13,4 @@ contract Test {
         require(owner == msg.sender);
         msg.sender.transfer(payments[msg.sender]);
     }
-
-    function TimestampDependency() public {
-        uint value = block.timestamp % 1000;
-        msg.sender.transfer(value);
-    }
 }

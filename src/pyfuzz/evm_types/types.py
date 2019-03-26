@@ -54,9 +54,17 @@ class TypeHandler():
                 with open(json_file, "r") as f:
                     self.seeds[_type] = list(json.load(f))
             else:
-                self.seeds[_type] = {0}
+                if type_list[_type]["type"] == "uint" or type_list[_type]["type"] == "int":
+                    self.seeds[_type] = [
+                        self.generateValueByType(_type, "min"),
+                        self.generateValueByType(_type, "max")
+                    ]
+                else:
+                    self.seeds[_type] = []
 
     def generateMinHexValue(self, size):
+        if size == 0:
+            return "0"
         res = "0" * ((size - 1) // 4)
         tmp = (size - 1) % 4
         if tmp == 0:
@@ -115,17 +123,19 @@ class TypeHandler():
             type_seeds = self.seeds[_type]
             if type_seeds == None or len(type_seeds) == 0:
                 logging.error("Cannot find seeds for ", _type)
-                return None
-            rand_index = random.randint(0, len(type_seeds)-1)
-            return type_seeds[rand_index]
+                # generate random value if seeds are unavailable
+                mode = "random"
+            else:
+                rand_index = random.randint(0, len(type_seeds)-1)
+                return type_seeds[rand_index]
         
         # if not seed mode
         if type_obj["type"] == "uint":
             num_size = random.randint(1, type_obj["size"])
             if mode == "min":
-                selected_uint = self.generateMinIntValue(num_size)
+                selected_uint = self.generateMinIntValue(0)
             elif mode == "max":
-                selected_uint = self.generateMaxIntValue(num_size)
+                selected_uint = self.generateMaxIntValue(type_obj["size"])
             elif mode == "random":
                 selected_uint = self.generateRandomIntValue(num_size)
             else:
@@ -136,17 +146,17 @@ class TypeHandler():
         elif type_obj["type"] == "int":
             num_size = random.randint(1, type_obj["size"])
             if mode == "min":
-                selected_int = self.generateMinIntValue(num_size)
+                selected_int = (- self.generateMinIntValue(type_obj["size"] - 1))
             elif mode == "max":
-                selected_int = self.generateMaxIntValue(num_size)
+                selected_int = self.generateMaxIntValue(type_obj["size"] - 1)
             elif mode == "random":
                 selected_int = self.generateRandomIntValue(num_size)
+                neg_prob = random.random()
+                if neg_prob < 0.5:
+                    selected_int = -selected_int
             else:
                 logging.error("Incorrect mode for generateValueByType.")
                 return None
-            neg_prob = random.random()
-            if neg_prob < 0.5:
-                selected_int = -selected_int
             return selected_int
         
         elif type_obj["type"] == "address":
@@ -180,7 +190,7 @@ class TypeHandler():
             if num_size == None:
                 num_size = random.randint(0, 32) * 8
             if mode == "min":
-                selected_hex = self.generateMinHexValue(num_size)
+                selected_hex = self.generateMinHexValue(8)
             elif mode == "max":
                 selected_hex = self.generateMaxHexValue(num_size)
             elif mode == "random":

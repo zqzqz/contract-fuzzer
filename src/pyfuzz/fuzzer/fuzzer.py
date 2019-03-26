@@ -16,10 +16,11 @@ class Fuzzer():
             self.evm = EvmHandler(evmEndPoint)
         else:
             self.evm = EvmHandler()
+        self.filename = None
         self.contract = None
         self.contractAbi = None
         self.contractAnalysisReport = None
-        # contract cache. Each element is a dict {"contract", "abi", "report"}
+        # contract cache. Each element is a dict {"name", "contract", "abi", "report", "visited"}
         self.contractMap = {}
         self.contractAddress = None
         # current state
@@ -48,6 +49,7 @@ class Fuzzer():
             json.dump(list(self.accounts.keys()), f, indent="\t")
 
     def loadContract(self, filename, contract_name):
+        self.filename = filename
         if filename in self.contractMap:
             # the contract is in cache
             self.contract = self.contractMap[filename]["contract"]
@@ -63,9 +65,11 @@ class Fuzzer():
             self.contractAnalysisReport = self.staticAnalyzer.run()
             # set cache
             self.contractMap[filename] = {
+                "name": contract_name,
                 "contract": self.contract,
                 "abi": self.contractAbi,
-                "report": self.contractAnalysisReport
+                "report": self.contractAnalysisReport,
+                "visited": set([])
             }
 
     def runOneTx(self, tx):
@@ -83,7 +87,7 @@ class Fuzzer():
         return traces
 
     def reward(self, traces):
-        report, reward = self.traceAnalyzer.run(self.traces, traces)
+        reward, report, jump_pcs = self.traceAnalyzer.run(self.traces, traces)
 
         self.accounts_p = self.accounts
         self.accounts = self.evm.getAccounts()
@@ -98,12 +102,30 @@ class Fuzzer():
             reward += 1
             report.append("balanceIncrease")
         self.traces = traces
-        return reward, report
+        return reward, report, jump_pcs
+
+    def loadSeed(self, txList, pcs):
+        """
+        add arguments of a tx list to seeds
+        """
+        assert(len(txList) == len(pcs))
+        seeds = self.contractAbi.typeHandler.seeds
+        visitedPcList = self.contractMap[self.filename]["visited"]
+        for i in range(len(txList)):
+            if pcs[i].issubset(visitedPcList):
+                continue
+            self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[i])
+            for arg in txList[i].typedArgs:
+                if arg[0] not in seeds:
+                    seeds[arg[0]] = [arg[1]]
+                else:
+                    seeds[arg[0]].append(arg[1])
 
     def mutate(self, state, action):
         txList = state.txList + []
         actionId = action.actionId
         actionArg = action.actionArg
+        print("action", actionId, actionArg)
         if actionId >= 0 and actionId < 2:
             # insert
             if actionArg < 0 or actionArg >= len(self.contractAbi.funcHashList):
@@ -163,13 +185,14 @@ class Fuzzer():
         return State(state.staticAnalysis, txList)
 
     def reset(self):
+        """
+        reset the fuzzer with current contract
+        """
         self.counter = 0
         if not self.contract:
             logging.error("Contract not inintialized in fuzzer.")
             return
         self.contractAddress = self.evm.deploy(self.contract)
-        # todo: whether this transfer must be successful?
-        trace = self.evm.sendTx(self.defaultAccount, self.contractAddress, "0xffffffff", "")
 
         self.state = State(self.contractAnalysisReport, [])
         self.traces = []
@@ -180,12 +203,18 @@ class Fuzzer():
         return state, seqLen
 
     def random_reset(self, datadir):
+        """
+        randomly select a contract from datadir and reset
+        """
         contract_files = os.listdir(datadir)
         filename = choice(contract_files)
         state, seqLen = self.contract_reset(datadir, filename)
         return state, seqLen, filename
 
     def contract_reset(self, datadir, filename):
+        """
+        reset fuzzer with the given contract file
+        """
         assert(filename != None)
         full_filename = os.path.join(datadir, filename)
         contract_name = filename.split('.')[0].split("#")[1]
@@ -200,12 +229,12 @@ class Fuzzer():
         if not nextState:
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, 0, done
-        # testing
-        # self.printTxList(nextState.txList)
+        # execute transactions
         traces = self.runTxs(nextState.txList)
-        reward, report = self.reward(traces)
-        # testing
-        # print(reward, report)
+        # get reward of executions
+        reward, report, pcs = self.reward(traces)
+        # update seeds
+        self.loadSeed(nextState.txList, pcs)
         # testing
         if self.counter >= 100 or len(report) > 0:
             done = 1

@@ -20,6 +20,13 @@ class Transaction:
         payload = self.hash + eth_abi.encode_abi(abi_array, self.args).hex()
         return payload
 
+    @property
+    def typedArgs(self):
+        abi_array = [abi_input["type"] for abi_input in self.abi["inputs"]]
+        assert(len(abi_array) == len(self.args))
+        return [(abi_array[i], self.args[i]) for i in range(len(abi_array))]
+
+
 
 class ContractAbi:
 

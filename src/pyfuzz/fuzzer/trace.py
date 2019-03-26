@@ -15,21 +15,26 @@ class TraceAnalyzer:
     """
     def run(self, ptraces, ctraces):
         report = self.detector.run(ctraces)
-        reward = self.path_variaty(ptraces, ctraces)
+        reward, jumps = self.path_variaty(ptraces, ctraces)
         # todo: assign rewards according to reports
-        return report, reward
+        return reward, report, jumps
 
     def path_variaty(self, ptraces, ctraces):
         pJumps = []
         cJumps = []
+        ret_jumps = []
         for ptrace in ptraces:
             for state in ptrace:
                 if state["op"][:4] == "JUMP":
                     pJumps.append(state["pc"])
         for ctrace in ctraces:
+            tmp_jumps = []
             for state in ctrace:
                 if state["op"][:4] == "JUMP":
+                    tmp_jumps.append(state["pc"])
                     cJumps.append(state["pc"])
+            ret_jumps.append(set(tmp_jumps))
+
         pJumps = list(set(pJumps))
         cJumps = list(set(cJumps))
         difJumps = list(set(pJumps + cJumps))
@@ -40,4 +45,4 @@ class TraceAnalyzer:
             comJumpNum = len(pJumps) + len(cJumps) - len(difJumps)
             reward = (len(pJumps) + len(cJumps) -
                       2 * comJumpNum) / len(difJumps)
-        return reward
+        return reward, ret_jumps

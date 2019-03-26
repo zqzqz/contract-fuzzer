@@ -9,11 +9,13 @@ def test():
     print("Reset...")
     state, seqLen = fuzzer.reset()
     fuzzer.printTxList(fuzzer.state.txList)
-    print(state)
+    print("state", state.shape)
     print("Mutate...")
-    state, seqLen, reward, done = fuzzer.step(1)
+    state, seqLen, reward, done = fuzzer.step(0)
     fuzzer.printTxList(fuzzer.state.txList)
-    print(state)
+    print("state:", state.shape)
+    print("visited:", fuzzer.contractMap[filename]["visited"])
+    print("seeds:", fuzzer.contractMap[filename]["abi"].typeHandler.seeds)
 
 
 if __name__ == "__main__":
