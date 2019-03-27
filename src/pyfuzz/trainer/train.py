@@ -1,4 +1,3 @@
-import logging
 import itertools
 import numpy as np
 import os
@@ -209,7 +208,7 @@ def deep_q_learning(sess,
     return
 
 
-def train(datadir):
+def train(datadir, episode_num=100, opts={}):
     print("training the DQN")
 
     # Where we save our checkpoints and graphs
@@ -223,7 +222,7 @@ def train(datadir):
     q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir)
     target_estimator = Estimator(scope="target_q")
 
-    env = Fuzzer(evmEndPoint=None)
+    env = Fuzzer(evmEndPoint=None, opts=opts)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -233,7 +232,7 @@ def train(datadir):
                                         q_estimator=q_estimator,
                                         target_estimator=target_estimator,
                                         experiment_dir=experiment_dir,
-                                        num_episodes=100,
+                                        num_episodes=episode_num,
                                         replay_memory_size=1000,
                                         replay_memory_init_size=100,
                                         update_target_estimator_every=100,

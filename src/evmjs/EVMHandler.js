@@ -184,6 +184,7 @@ EVMHandler = {
 
   // send a raw transaction
   sendTx: (from, to, value, data) => {
+    if (value == "") value = "0";
     return new Promise((resolve, reject) => {
       EVMHandler.txCnt += 1;
       let opts = {
@@ -192,7 +193,7 @@ EVMHandler = {
         gasLimit: new BN(3000000, 10),
         from: Buffer.from(from.replace("0x", ""), 'hex'),
         to: Buffer.from(to.replace("0x", ""), 'hex'),
-        value: new BN(parseInt(value, 10), 10),
+        value: new BN(value, 10),
         data: Buffer.from(data.replace("0x", ""), 'hex')
       }
       let tx = new Tx(opts)

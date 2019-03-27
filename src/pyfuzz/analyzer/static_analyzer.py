@@ -1,6 +1,5 @@
 from pyfuzz.analyzer.ir_analyzer import Visitor, IrAnalyzer
 from pyfuzz.config import ANALYSIS_CONFIG
-import logging
 import eth_utils
 from types import MethodType
 import slither

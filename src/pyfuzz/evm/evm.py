@@ -8,6 +8,8 @@ import logging
 import pyfuzz.evm.evm_pb2
 import pyfuzz.evm.evm_pb2_grpc
 
+logger = logging.getLogger("EVM")
+
 class EvmHandler():
     def __init__(self, endpoint='localhost:50051'):
         self.channel = grpc.insecure_channel(endpoint)
@@ -27,7 +29,7 @@ class EvmHandler():
         if not ret or len(ret) > 0:
             return json.loads(ret)
         else:
-            logging.error("Correct response not received from rpc server (getAccounts)")
+            logger.error("Correct response not received from rpc server (getAccounts)")
             return None
 
     def compile(self, text, name):
@@ -36,7 +38,7 @@ class EvmHandler():
         if not ret or len(ret.data) > 0:
             return json.loads(ret.data)
         else:
-            logging.error("Correct response not received from rpc server (compile)")
+            logger.error("Correct response not received from rpc server (compile)")
             return None
 
     def deploy(self, contract):
@@ -56,5 +58,5 @@ class EvmHandler():
         if not ret or len(ret) > 0:
             return json.loads(ret)
         else:
-            logging.error("Correct response not received from rpc server (sendTx)")
+            logger.error("Correct response not received from rpc server (sendTx)")
             return None

@@ -8,6 +8,8 @@ class Vulnerability():
         self.description = description
 
     def __eq__(self, other):
+        if self.__class__() != other.__class__():
+            return False
         return self.vul_type == other.vul_type and self.pc == other.pc
 
     def __hash__(self):
@@ -17,7 +19,7 @@ class Vulnerability():
         m.update(payload.encode("utf-8"))
         return int(m.hexdigest(), 16)
 
-    def __str__(self):
+    def __repr__(self):
         return "{}: pc {}".format(self.vul_type, str(self.pc))
 
     def __dict__(self):

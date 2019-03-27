@@ -1,9 +1,9 @@
 import os
 
 TRAIN_CONFIG = {
-    "max_call_num": 2,
-    "max_func_num": 4,
-    "max_func_arg": 6,
+    "max_call_num": 3,
+    "max_func_num": 6,
+    "max_func_arg": 4,
 }
 
 TRAIN_CONFIG["action_num"] = TRAIN_CONFIG["max_func_num"] * 2 + TRAIN_CONFIG["max_call_num"] * 3 + 2
@@ -20,8 +20,9 @@ TRAIN_CONFIG["max_line_length"] = ANALYSIS_CONFIG["token_size"] * ANALYSIS_CONFI
 
 FUZZ_CONFIG = {
     "seed_prob": 0.4,
-    "random_action_prob": 0.4,
-    "account_balance": "0xffffffffffffffffffffffff"
+    "random_action_prob": 0.3,
+    "account_balance": "0xffffffffffffffffffffffff",
+    "max_attempt": 100
 }
 
 DIR_CONFIG = {}

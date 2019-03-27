@@ -3,6 +3,7 @@ from pyfuzz.fuzzer.interface import ContractAbi, Transaction
 from pyfuzz.trainer.model import *
 from pyfuzz.fuzzer.trace import *
 from pyfuzz.analyzer.static_analyzer import *
+from pyfuzz.fuzzer.exploit import Exploit
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
 
 import logging
@@ -10,12 +11,22 @@ from random import randint, choice
 import json
 import os
 
+logger = logging.getLogger("Fuzzer")
+
 class Fuzzer():
-    def __init__(self, evmEndPoint=None):
+    def __init__(self, evmEndPoint=None, opts={}):
+        # load config
+        self.opts = opts
+        if "exploit" not in opts:
+            self.opts["exploit"] = True
+        if "vulnerability" not in opts:
+            self.opts["vulnerability"] = False
+        # init evm handler
         if evmEndPoint:
             self.evm = EvmHandler(evmEndPoint)
         else:
             self.evm = EvmHandler()
+        # contract properties
         self.filename = None
         self.contract = None
         self.contractAbi = None
@@ -35,7 +46,7 @@ class Fuzzer():
         self.actionProcessor = ActionProcessor()
         # execution results
         self.traces = []
-        self.reports = []
+        self.report = []
         # eth accounts
         self.accounts = self.evm.getAccounts()
         self.defaultAccount = list(self.accounts.keys())[0]
@@ -49,6 +60,11 @@ class Fuzzer():
             json.dump(list(self.accounts.keys()), f, indent="\t")
 
     def loadContract(self, filename, contract_name):
+        self.state = None
+        self.seqLen = None
+        self.traces = []
+        self.report = []
+        self.counter = 0
         self.filename = filename
         if filename in self.contractMap:
             # the contract is in cache
@@ -74,7 +90,7 @@ class Fuzzer():
 
     def runOneTx(self, tx):
         if self.contract == None:
-            logging.error("Contract have not been loaded.")
+            logger.error("Contract have not been loaded.")
             return None
         trace = self.evm.sendTx(tx.sender, self.contractAddress,
                                 str(tx.value), tx.payload)
@@ -89,19 +105,8 @@ class Fuzzer():
 
     def reward(self, traces):
         reward, report, jump_pcs = self.traceAnalyzer.run(self.traces, traces)
-
-        self.accounts = self.evm.getAccounts()
-        # balance increase
-        bal_p = 0
-        bal = 0
-        for acc in self.accounts.keys():
-            bal_p += int(FUZZ_CONFIG["account_balance"], 16)
-            bal += int(self.accounts[acc], 16)
-
-        if bal > bal_p:
-            reward += 1
-            report.append("balanceIncrease")
         self.traces = traces
+        
         return reward, report, jump_pcs
 
     def loadSeed(self, txList, pcs):
@@ -189,13 +194,13 @@ class Fuzzer():
         """
         self.counter = 0
         if not self.contract:
-            logging.error("Contract not inintialized in fuzzer.")
+            logger.error("Contract not inintialized in fuzzer.")
             return
         self.contractAddress = self.evm.deploy(self.contract)
 
         self.state = State(self.contractAnalysisReport, [])
         self.traces = []
-        self.reports = []
+        self.report = []
         # randomFuncIndex = randint(0, len(self.contractAbi.funcHashList)-1)
         # self.state = self.mutate(self.state, actionProcessor.encode(0, randomFuncIndex))
         state, seqLen = self.stateProcessor.encodeState(self.state)
@@ -234,14 +239,27 @@ class Fuzzer():
         reward, report, pcs = self.reward(traces)
         # update seeds
         self.loadSeed(nextState.txList, pcs)
+        # check whether exploitation happens
+        if self.opts["exploit"]:
+            self.accounts = self.evm.getAccounts()
+            # balance increase
+            bal_p = 0
+            bal = 0
+            for acc in self.accounts.keys():
+                bal_p += int(FUZZ_CONFIG["account_balance"], 16)
+                bal += int(self.accounts[acc], 16)
+
+            if bal > bal_p:
+                reward += 1
+                report.append(Exploit(nextState.txList, bal-bal_p))
         # testing
-        if self.counter >= 100 or len(report) > 0:
+        if self.counter >= FUZZ_CONFIG["max_attempt"] or len(report) > 0:
             done = 1
         # update
         self.state = nextState
         self.traces = traces
         # should exclude repeated reports
-        self.reports = list(set(self.reports + report))
+        self.report = list(set(self.report + report))
         state, seqLen = self.stateProcessor.encodeState(self.state)
         return state, seqLen, reward, done
 

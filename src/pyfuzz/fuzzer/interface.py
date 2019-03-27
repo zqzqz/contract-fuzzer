@@ -1,5 +1,4 @@
 import json
-import logging
 import eth_abi
 from pyfuzz.evm_types.types import TypeHandler
 from pyfuzz.config import FUZZ_CONFIG
@@ -11,7 +10,6 @@ class Transaction:
         self.args = args
         self.value = value
         self.sender = sender
-        self.trace = None
         self.abi = abi
 
     @property
@@ -29,6 +27,12 @@ class Transaction:
     @property
     def inputTypes(self):
         return [abi_input["type"] for abi_input in self.abi["inputs"]]
+
+    def __repr__(self):
+        return "payload: {}, sender: {}, value: {}".format(self.payload, self.sender, self.value)
+
+    def __eq__(self, other):
+        return self.__class__() == self.__class__() and self.__repr__() == self.__repr__()
 
 
 

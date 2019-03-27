@@ -7,6 +7,8 @@ import json
 from pyfuzz.config import DIR_CONFIG
 from pyfuzz.utils.utils import hexCode, binaryToHex, hexToBinary
 
+logger = logging.getLogger("Types")
+
 # EVM Types
 type_list = {
     "uint": { "type": "uint", "size": 256 },
@@ -112,17 +114,17 @@ class TypeHandler():
     def generateValueByType(self, _type, mode="random"):
         type_obj = self.type_list[_type]
         if type_obj == None:
-            logging.error("EVM type not found " + _type)
+            logger.error("EVM type not found " + _type)
             return None
         if mode not in self.mode_list:
-            logging.error("Incorrect mode for generateValueByType.")
+            logger.error("Incorrect mode for generateValueByType.")
             return None
         
         # seed mode
         if mode == "seed" or _type == "address":
             type_seeds = self.seeds[_type]
             if type_seeds == None or len(type_seeds) == 0:
-                logging.error("Cannot find seeds for ", _type)
+                logger.error("Cannot find seeds for ", _type)
                 # generate random value if seeds are unavailable
                 mode = "random"
             else:
@@ -139,7 +141,7 @@ class TypeHandler():
             elif mode == "random":
                 selected_uint = self.generateRandomIntValue(num_size)
             else:
-                logging.error("Incorrect mode for generateValueByType.")
+                logger.error("Incorrect mode for generateValueByType.")
                 return None
             return selected_uint
         
@@ -155,13 +157,13 @@ class TypeHandler():
                 if neg_prob < 0.5:
                     selected_int = -selected_int
             else:
-                logging.error("Incorrect mode for generateValueByType.")
+                logger.error("Incorrect mode for generateValueByType.")
                 return None
             return selected_int
         
         elif type_obj["type"] == "address":
             # 'address' generation only support 'seed' mode
-            logging.error(
+            logger.error(
                 "Only seed mode is acceptable for address generation.")
             return None
         
@@ -181,7 +183,7 @@ class TypeHandler():
             elif mode == "random":
                 selected_hex = self.generateRandomHexValue(num_size)
             else:
-                logging.error("Incorrect mode for generateValueByType.")
+                logger.error("Incorrect mode for generateValueByType.")
                 return None
             return "0x" + selected_hex
 
@@ -196,7 +198,7 @@ class TypeHandler():
             elif mode == "random":
                 selected_hex = self.generateRandomHexValue(num_size)
             else:
-                logging.error("Incorrect mode for generateValueByType.")
+                logger.error("Incorrect mode for generateValueByType.")
                 return None
             return "0x" + selected_hex
 
@@ -208,7 +210,7 @@ class TypeHandler():
             return selected_array
 
         else:
-            logging.error("EVM type not found " + _type)
+            logger.error("EVM type not found " + _type)
             return None
 
     def fuzzByType(self, _type, seed_prob):

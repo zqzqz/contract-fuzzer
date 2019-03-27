@@ -6,14 +6,17 @@ import numpy as np
 import argparse
 import logging
 
-def fuzz(datadir):
+logging.basicConfig()
+logger = logging.getLogger("pyfuzz")
+
+def fuzz(datadir, opts):
     print("fuzzing the contracts")
 
     # Where we save our checkpoints and graphs
     experiment_dir = DIR_CONFIG["experiment_dir"]
 
     # initialize fuzzer framework
-    env = Fuzzer(evmEndPoint=None)
+    env = Fuzzer(evmEndPoint=None, opts=opts)
 
     # Create estimators
     actionProcessor = ActionProcessor(env.maxFuncNum, env.maxCallNum)
@@ -59,24 +62,32 @@ def fuzz(datadir):
                 state, seq_len, reward, done = env.step(action)
 
                 if done:
+                    logger.info("contract {} finished".format(filename))
+                    for rep in env.report:
+                        logger.info(repr(rep))
                     break
 
 
 def main():
     parser = argparse.ArgumentParser(description='Contract fuzzer')
-    parser.add_argument('--train', action='store_const',
-                        const=1, default=0,
-                        help='train q estimator for DQN in the fuzzer')
+    parser.add_argument('--train', action='store_const', const=True, default=False, help='train q estimator for DQN in the fuzzer')
     parser.add_argument("--datadir", help="directory containing contract source files")
+    parser.add_argument("--episode", type=int, help="number of episode", default=100)
+    parser.add_argument("--exploit", action='store_const', default=False, const=True, help="find exploitations")
+    parser.add_argument("--vulnerability", action='store_const', default=False, const=True, help="find vulnerabilities")
 
     args = parser.parse_args()
     if not os.path.isdir(args.datadir):
-        logging.error("wrong datadir")
+        logger.error("wrong datadir")
         exit(1)
+    opts = {
+        "exploit": args.exploit,
+        "vulnerability": args.vulnerability
+    }
     if args.train:
-        train(args.datadir)
+        train(args.datadir, args.episode, opts)
     else:
-        fuzz(args.datadir)
+        fuzz(args.datadir, opts)
 
 if __name__ == '__main__':
     main()

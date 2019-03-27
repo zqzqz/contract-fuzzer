@@ -1,5 +1,4 @@
 from pyfuzz.fuzzer.detector.detector import Detector
-import logging
 
 class TraceAnalyzer:
     def __init__(self):
@@ -13,8 +12,10 @@ class TraceAnalyzer:
           report (list(string)): found vulnerabilities
           reward (int): calculated reward
     """
-    def run(self, ptraces, ctraces):
-        report = self.detector.run(ctraces)
+    def run(self, ptraces, ctraces, detect_flag=True):
+        report = []
+        if detect_flag:
+            report = self.detector.run(ctraces)
         reward, jumps = self.path_variaty(ptraces, ctraces)
         # todo: assign rewards according to reports
         return reward, report, jumps

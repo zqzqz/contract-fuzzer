@@ -1,6 +1,5 @@
 from slither.slither import Slither
 from slither.slithir.operations import *
-import logging
 import time
 
 
