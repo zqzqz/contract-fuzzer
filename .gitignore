@@ -8,3 +8,4 @@ share
 __pycache__
 pip-selfcheck.json
 experiments
+*.pyc

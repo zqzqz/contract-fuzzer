@@ -41,6 +41,9 @@ EVMHandler = {
   web3: new Web3(),
   // a nonce
   t: 12,
+  defaultBalance: "0xffffffffffffffffffffffff",
+  startTime: new Date().getTime() / 1000 | 0,
+  txCnt: 0,
 
   init: () => {
     return new Promise((resolve, reject) => {
@@ -56,6 +59,8 @@ EVMHandler = {
             return true
           }
         })
+        EVMHandler.startTime = new Date().getTime() / 1000 | 0
+        EVMHandler.txCnt = 0
         resolve();
       })
     });
@@ -76,25 +81,34 @@ EVMHandler = {
         if (!EVMHandler.defaultAccount) {
           EVMHandler.defaultAccount = utileth.bufferToHex(address).replace("0x", "");
         }
-        // set balance for each account
-        let account = new Account();
-        account.balance = "0xffffffffffffffffffffffff"
-        EVMHandler.stateTrie.put(address, account.serialize(), () => {
-          next();
-        })
-        // // use putAccountBalance ? failed
-        // vm.stateManager.putAccountBalance(address, new BN("ffffffffffffffffffffffff", 16), function cb () { next() })
-        // // use putAccount & getAccount ? failed
-        // vm.stateManager.getAccount(address, (res, account) => {
-        //   account.balance = "0xffffffffffffffffffffffff";
-        //   vm.stateManager.putAccount(address, account, () => {
-        //     next();
-        //   })
-        // })
+        next();
       }, (err) => {
         // nothing;
       })
-      resolve(vm);
+      EVMHandler.resetBalance(EVMHandler.defaultBalance).then(() => {
+        resolve(vm);
+      })
+    });
+  },
+
+  resetBalance: (balance) => {
+    return new Promise((resolve, reject) => {
+      let accList = Object.keys(EVMHandler.accounts);
+      async.eachSeries(accList, (addressHex, next) => {
+        // set balance for each account
+        if (utileth.isHexPrefixed(addressHex)) {
+          addressHex = addressHex.replace("0x", "")
+        }
+        let address = Buffer.from(addressHex, "hex")
+        let account = new Account();
+        account.balance = balance
+        EVMHandler.stateTrie.put(address, account.serialize(), () => {
+          next();
+        })
+      }, (err) => {
+        // nothing;
+      })
+      resolve();
     });
   },
 
@@ -112,7 +126,10 @@ EVMHandler = {
       let accList = Object.keys(EVMHandler.accounts);
       let accountsWithBalance = {};
       async.eachSeries(accList, (addressHex, next) => {
-        // acc = Buffer.from(acc, "hex")
+        if (addressHex == EVMHandler.defaultAccount) {
+          next();
+          return;
+        }
         if (utileth.isHexPrefixed(addressHex)) {
           addressHex = addressHex.replace("0x", "")
         }
@@ -131,27 +148,29 @@ EVMHandler = {
   // deploy a new contract; take compiled contract from solc as input
   deploy: (contract) => {
     return new Promise((resolve, reject) => {
-      let accs = Object.keys(EVMHandler.accounts)
-      EVMHandler.sendTx(EVMHandler.defaultAccount, "", "0", contract.bytecode).then((result) => {
-        if (!result.createdAddress) reject(Error("Invalid contract address"));
-        let contractAddress = result.createdAddress.toString("hex")
-        EVMHandler.contracts[contractAddress] = contract;
-        // init balance for newly deployed contracts
-        let account = EVMHandler.stateTrie.get(result.createdAddress, (err, accData) => {
-          let account = new Account(accData);
-          account.balance = "0xffffffffffffffffffffffff";
-          EVMHandler.stateTrie.put(result.createdAddress, account.serialize(), () => {
-            resolve(result);
-          })
-        });
-        // EVMHandler.vm.stateManager.getAccount(result.createdAddress, (err, account) => {
-        //   account.balance = "0xffffffffffffffffffffffff";
-        //   EVMHandler.vm.stateManager.putAccount(contractAddress, account, () => {
-        //     resolve(result);
-        //   })
-        // })
-      }).catch((err) => {
-        reject(err)
+      EVMHandler.resetBalance(EVMHandler.defaultBalance).then(() => {
+        let accs = Object.keys(EVMHandler.accounts)
+        EVMHandler.sendTx(EVMHandler.defaultAccount, "", "0", contract.bytecode).then((result) => {
+          if (!result.createdAddress) reject(Error("Invalid contract address"));
+          let contractAddress = result.createdAddress.toString("hex")
+          EVMHandler.contracts[contractAddress] = contract;
+          // init balance for newly deployed contracts
+          let account = EVMHandler.stateTrie.get(result.createdAddress, (err, accData) => {
+            let account = new Account(accData);
+            account.balance = "0xffffffffffffffffffffffff";
+            EVMHandler.stateTrie.put(result.createdAddress, account.serialize(), () => {
+              resolve(result);
+            })
+          });
+          // EVMHandler.vm.stateManager.getAccount(result.createdAddress, (err, account) => {
+          //   account.balance = "0xffffffffffffffffffffffff";
+          //   EVMHandler.vm.stateManager.putAccount(contractAddress, account, () => {
+          //     resolve(result);
+          //   })
+          // })
+        }).catch((err) => {
+          reject(err)
+        })
       })
     })
   },
@@ -166,7 +185,7 @@ EVMHandler = {
   // send a raw transaction
   sendTx: (from, to, value, data) => {
     return new Promise((resolve, reject) => {
-
+      EVMHandler.txCnt += 1;
       let opts = {
         nonce: new BN(from.nonce++),
         gasPrice: new BN(1),
@@ -181,13 +200,13 @@ EVMHandler = {
       tx.sign(Buffer.from(EVMHandler.accounts[from], 'hex'));
       let block = new Block({
         header: {
-          timestamp: new Date().getTime() / 1000 | 0,
+          timestamp: EVMHandler.startTime + EVMHandler.txCnt * 3600 * 24 * 5,
           number: 0
         },
         transactions: [],
         uncleHeaders: []
       })
-      EVMHandler.vm.runTx({block: block, tx: tx, skipBalance: false, skipNonce: true}, function (error, result) {
+      EVMHandler.vm.runTx({block: block, tx: tx, skipBalance: false, skipNonce: true}, (error, result) => {
         if (error || result == null || result === undefined) {
           reject(error);
         }
@@ -202,7 +221,7 @@ EVMHandler = {
           }
         })
       })
-    });
+    })
   },
 
   // send transaction with formatted inputs

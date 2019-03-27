@@ -3,7 +3,7 @@ from pyfuzz.fuzzer.interface import ContractAbi, Transaction
 from pyfuzz.trainer.model import *
 from pyfuzz.fuzzer.trace import *
 from pyfuzz.analyzer.static_analyzer import *
-from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG
+from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
 
 import logging
 from random import randint, choice
@@ -38,7 +38,7 @@ class Fuzzer():
         self.reports = []
         # eth accounts
         self.accounts = self.evm.getAccounts()
-        self.defaultAccount = list(self.accounts.keys())[1]
+        self.defaultAccount = list(self.accounts.keys())[0]
         # analyzers
         self.traceAnalyzer = TraceAnalyzer()
         self.staticAnalyzer = StaticAnalyzer()
@@ -81,6 +81,7 @@ class Fuzzer():
         return trace
 
     def runTxs(self, txList):
+        self.contractAddress = self.evm.deploy(self.contract)
         traces = []
         for tx in txList:
             traces.append(self.runOneTx(tx))
@@ -89,13 +90,12 @@ class Fuzzer():
     def reward(self, traces):
         reward, report, jump_pcs = self.traceAnalyzer.run(self.traces, traces)
 
-        self.accounts_p = self.accounts
         self.accounts = self.evm.getAccounts()
         # balance increase
         bal_p = 0
         bal = 0
         for acc in self.accounts.keys():
-            bal_p += int(self.accounts_p[acc], 16)
+            bal_p += int(FUZZ_CONFIG["account_balance"], 16)
             bal += int(self.accounts[acc], 16)
 
         if bal > bal_p:
@@ -163,7 +163,7 @@ class Fuzzer():
                 sender = state.txList[actionArg].sender
                 attempt = 100
                 while sender == state.txList[actionArg].sender and attempt > 0:
-                    randIndex = randint(1, len(self.accounts.keys())-1)
+                    randIndex = randint(0, len(self.accounts.keys())-1)
                     sender = list(self.accounts.keys())[randIndex]
                     sender = self.defaultAccount
                     attempt -= 1

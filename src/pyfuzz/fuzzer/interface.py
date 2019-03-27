@@ -16,15 +16,19 @@ class Transaction:
 
     @property
     def payload(self):
-        abi_array = [abi_input["type"] for abi_input in self.abi["inputs"]]
+        abi_array = self.inputTypes
         payload = self.hash + eth_abi.encode_abi(abi_array, self.args).hex()
         return payload
 
     @property
     def typedArgs(self):
-        abi_array = [abi_input["type"] for abi_input in self.abi["inputs"]]
+        abi_array = self.inputTypes
         assert(len(abi_array) == len(self.args))
         return [(abi_array[i], self.args[i]) for i in range(len(abi_array))]
+
+    @property
+    def inputTypes(self):
+        return [abi_input["type"] for abi_input in self.abi["inputs"]]
 
 
 
