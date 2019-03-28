@@ -226,20 +226,18 @@ def train(datadir, episode_num=100, opts={}):
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for t, stats in deep_q_learning(sess,
-                                        env,
-                                        datadir,
-                                        q_estimator=q_estimator,
-                                        target_estimator=target_estimator,
-                                        experiment_dir=experiment_dir,
-                                        num_episodes=episode_num,
-                                        replay_memory_size=1000,
-                                        replay_memory_init_size=100,
-                                        update_target_estimator_every=100,
-                                        epsilon_start=1.0,
-                                        epsilon_end=0.1,
-                                        epsilon_decay_steps=5000,
-                                        discount_factor=0.99,
-                                        batch_size=16):
-
-            print("\nEpisode Reward: {}".format(stats.episode_rewards[-1]))
+        deep_q_learning(sess,
+                        env,
+                        datadir,
+                        q_estimator=q_estimator,
+                        target_estimator=target_estimator,
+                        experiment_dir=experiment_dir,
+                        num_episodes=episode_num,
+                        replay_memory_size=1000,
+                        replay_memory_init_size=100,
+                        update_target_estimator_every=100,
+                        epsilon_start=1.0,
+                        epsilon_end=0.1,
+                        epsilon_decay_steps=5000,
+                        discount_factor=0.99,
+                        batch_size=16)

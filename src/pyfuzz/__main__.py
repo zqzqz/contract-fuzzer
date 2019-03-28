@@ -5,12 +5,14 @@ from pyfuzz.trainer.train import train
 import numpy as np
 import argparse
 import logging
+import sys
 
 logging.basicConfig()
 logger = logging.getLogger("pyfuzz")
+logger.setLevel(logging.INFO)
 
 def fuzz(datadir, opts):
-    print("fuzzing the contracts")
+    logger.info("fuzzing the contracts")
 
     # Where we save our checkpoints and graphs
     experiment_dir = DIR_CONFIG["experiment_dir"]
@@ -19,8 +21,8 @@ def fuzz(datadir, opts):
     env = Fuzzer(evmEndPoint=None, opts=opts)
 
     # Create estimators
-    actionProcessor = ActionProcessor(env.maxFuncNum, env.maxCallNum)
-    stateProcessor = StateProcessor(env.maxFuncNum, env.maxCallNum)
+    actionProcessor = ActionProcessor()
+    stateProcessor = StateProcessor()
     # q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir, action_num=actionProcessor.actionNum)
     # target_estimator = Estimator(scope="target_q")
 
@@ -37,7 +39,7 @@ def fuzz(datadir, opts):
 
         graph = tf.get_default_graph()
         predictions = graph.get_tensor_by_name(
-            "q_estimator/linear/predictions:0")
+            "q_estimator/CNN/predictions:0")
         X = graph.get_tensor_by_name("q_estimator/X:0")
         real_seq_length = graph.get_tensor_by_name(
             "q_estimator/real_seq_length:0")
@@ -49,7 +51,12 @@ def fuzz(datadir, opts):
             env.loadContract(full_filename, contract_name)
 
             state, seq_len = env.reset()
+            tx_list = None
             while True:
+                if not env.state.txList or env.state.txList != tx_list:
+                    tx_list = env.state.txList
+                    logger.info(env.state.txList)
+
                 feed_dict = {X: np.expand_dims(
                     state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
                 q_values = sess.run(predictions, feed_dict)[0]

@@ -32,7 +32,7 @@ class Transaction:
         return "payload: {}, sender: {}, value: {}".format(self.payload, self.sender, self.value)
 
     def __eq__(self, other):
-        return self.__class__() == self.__class__() and self.__repr__() == self.__repr__()
+        return self.__class__ == self.__class__ and self.__repr__() == self.__repr__()
 
 
 

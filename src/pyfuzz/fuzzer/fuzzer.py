@@ -12,6 +12,7 @@ import json
 import os
 
 logger = logging.getLogger("Fuzzer")
+logger.setLevel(logging.INFO)
 
 class Fuzzer():
     def __init__(self, evmEndPoint=None, opts={}):
@@ -104,7 +105,7 @@ class Fuzzer():
         return traces
 
     def reward(self, traces):
-        reward, report, jump_pcs = self.traceAnalyzer.run(self.traces, traces)
+        reward, report, jump_pcs = self.traceAnalyzer.run(self.traces, traces, self.opts["vulnerability"])
         self.traces = traces
         
         return reward, report, jump_pcs
@@ -168,9 +169,11 @@ class Fuzzer():
                 sender = state.txList[actionArg].sender
                 attempt = 100
                 while sender == state.txList[actionArg].sender and attempt > 0:
-                    randIndex = randint(0, len(self.accounts.keys())-1)
-                    sender = list(self.accounts.keys())[randIndex]
-                    sender = self.defaultAccount
+                    randIndex = randint(0, len(self.accounts.keys()) * 2)
+                    if randIndex >= len(self.accounts.keys()):
+                        sender = self.defaultAccount
+                    else:
+                        sender = list(self.accounts.keys())[randIndex]
                     attempt -= 1
                 txList[actionArg].sender = sender
             else:

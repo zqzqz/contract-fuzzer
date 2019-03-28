@@ -187,6 +187,7 @@ class Estimator():
             flattened = tf.contrib.layers.flatten(pool3)
             fc1 = tf.contrib.layers.fully_connected(flattened, 512)
             self.predictions = tf.contrib.layers.fully_connected(fc1, action_num)
+            self.predictions = tf.identity(self.predictions, name="predictions")
 
         # linear transformation
         with tf.name_scope("linear"):

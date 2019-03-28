@@ -7,8 +7,6 @@ import json
 from pyfuzz.config import DIR_CONFIG
 from pyfuzz.utils.utils import hexCode, binaryToHex, hexToBinary
 
-logger = logging.getLogger("Types")
-
 # EVM Types
 type_list = {
     "uint": { "type": "uint", "size": 256 },
