@@ -39,10 +39,10 @@ def fuzz(datadir, opts):
 
         graph = tf.get_default_graph()
         predictions = graph.get_tensor_by_name(
-            "q_estimator/CNN/predictions:0")
-        X = graph.get_tensor_by_name("q_estimator/X:0")
+            "target_q/CNN/predictions:0")
+        X = graph.get_tensor_by_name("target_q/X:0")
         real_seq_length = graph.get_tensor_by_name(
-            "q_estimator/real_seq_length:0")
+            "target_q/real_seq_length:0")
 
         contract_files = os.listdir(datadir)
         for filename in contract_files:
@@ -51,11 +51,8 @@ def fuzz(datadir, opts):
             env.loadContract(full_filename, contract_name)
 
             state, seq_len = env.reset()
-            tx_list = None
             while True:
-                if not env.state.txList or env.state.txList != tx_list:
-                    tx_list = env.state.txList
-                    logger.info(env.state.txList)
+                logger.info(env.state.txList)
 
                 feed_dict = {X: np.expand_dims(
                     state, 0), real_seq_length: np.expand_dims(seq_len, 0)}

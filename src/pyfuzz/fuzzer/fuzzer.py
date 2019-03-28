@@ -101,6 +101,8 @@ class Fuzzer():
         self.contractAddress = self.evm.deploy(self.contract)
         traces = []
         for tx in txList:
+            if not tx:
+                continue
             traces.append(self.runOneTx(tx))
         return traces
 
@@ -114,79 +116,74 @@ class Fuzzer():
         """
         add arguments of a tx list to seeds
         """
-        assert(len(txList) == len(pcs))
+        valid_tx_cnt = 0
+        for tx in txList:
+            if tx:
+                valid_tx_cnt += 1
+        assert(valid_tx_cnt == len(pcs))
+
         seeds = self.contractAbi.typeHandler.seeds
         visitedPcList = self.contractMap[self.filename]["visited"]
+        j = 0
         for i in range(len(txList)):
-            if pcs[i].issubset(visitedPcList):
+            if not txList[i]:
                 continue
-            self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[i])
+            if pcs[j].issubset(visitedPcList):
+                continue
+            self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[j])
             for arg in txList[i].typedArgs:
                 if arg[0] not in seeds:
                     seeds[arg[0]] = [arg[1]]
                 else:
                     seeds[arg[0]].append(arg[1])
+            j += 1
 
     def mutate(self, state, action):
         txList = state.txList + []
         actionId = action.actionId
         actionArg = action.actionArg
-        if actionId >= 0 and actionId < 2:
-            # insert
-            if actionArg < 0 or actionArg >= len(self.contractAbi.funcHashList):
+        txHash = None
+        if actionArg < 0 or actionArg >= self.maxCallNum:
+            return None
+        if txList[actionArg]:
+            txHash = txList[actionArg].hash
+        
+        # modify
+        if actionId == 0:
+            funcHash = txHash
+            attempt = 100
+            while funcHash == txHash and attempt > 0:
+                funcHash = choice(self.contractAbi.funcHashList)
+                attempt -= 1
+            tx = self.contractAbi.generateTx(funcHash, self.defaultAccount)
+            txList[actionArg] = tx
+        elif actionId == 1:
+            # modify args
+            if txHash == None:
                 return None
-            if len(txList) >= self.maxCallNum:
+            txList[actionArg].args = self.contractAbi.generateTxArgs(txHash)
+        elif actionId == 2:
+            # modify sender
+            if txHash == None:
                 return None
-            tx = self.contractAbi.generateTx(
-                self.contractAbi.funcHashList[actionArg], self.defaultAccount)
-            if actionId == 0:
-                # insert at first
-                txList.insert(0, tx)
-            else:
-                # insert at last
-                txList.append(tx)
-        elif actionId < 4:
-            # remove
-            if len(txList) <= 0:
-                # cannot remove
+            sender = state.txList[actionArg].sender
+            attempt = 100
+            while sender == state.txList[actionArg].sender and attempt > 0:
+                randIndex = randint(0, len(self.accounts.keys())-1)
+                sender = list(self.accounts.keys())[randIndex]
+                attempt -= 1
+            txList[actionArg].sender = sender
+        elif actionId == 3:
+            # modify value
+            if not self.contractAbi.interface[txHash]['payable']:
+                # not payable function
                 return None
-            if actionId == 2:
-                # remove the first
-                del txList[0]
-            else:
-                # remove the last
-                txList.pop()
-        elif actionId < 7:
-            # modify
-            if actionArg < 0 or actionArg >= len(txList):
-                return None
-            funcHash = state.txList[actionArg].hash
-            if actionId == 4:
-                # modify args
-                txList[actionArg].args = self.contractAbi.generateTxArgs(funcHash)
-            elif actionId == 5:
-                # modify sender
-                sender = state.txList[actionArg].sender
-                attempt = 100
-                while sender == state.txList[actionArg].sender and attempt > 0:
-                    randIndex = randint(0, len(self.accounts.keys()) * 2)
-                    if randIndex >= len(self.accounts.keys()):
-                        sender = self.defaultAccount
-                    else:
-                        sender = list(self.accounts.keys())[randIndex]
-                    attempt -= 1
-                txList[actionArg].sender = sender
-            else:
-                # modify value
-                if not self.contractAbi.interface[funcHash]['payable']:
-                    # not payable function
-                    return None
-                value = state.txList[actionArg].value
-                attempt = 100
-                while value == state.txList[actionArg].value and attempt > 0:
-                    value = self.contractAbi.generateTxValue(funcHash)
-                    attempt -= 1
-                txList[actionArg].value = value
+            value = state.txList[actionArg].value
+            attempt = 100
+            while value == state.txList[actionArg].value and attempt > 0:
+                value = self.contractAbi.generateTxValue(funcHash)
+                attempt -= 1
+            txList[actionArg].value = value
         else:
             return None
         return State(state.staticAnalysis, txList)
@@ -201,11 +198,9 @@ class Fuzzer():
             return
         self.contractAddress = self.evm.deploy(self.contract)
 
-        self.state = State(self.contractAnalysisReport, [])
+        self.state = State(self.contractAnalysisReport, [None for i in range(self.maxCallNum)])
         self.traces = []
         self.report = []
-        # randomFuncIndex = randint(0, len(self.contractAbi.funcHashList)-1)
-        # self.state = self.mutate(self.state, actionProcessor.encode(0, randomFuncIndex))
         state, seqLen = self.stateProcessor.encodeState(self.state)
         return state, seqLen
 
@@ -240,6 +235,8 @@ class Fuzzer():
         traces = self.runTxs(nextState.txList)
         # get reward of executions
         reward, report, pcs = self.reward(traces)
+        # bonus for valid mutation
+        reward += FUZZ_CONFIG["valid_mutation_reward"]
         # update seeds
         self.loadSeed(nextState.txList, pcs)
         # check whether exploitation happens
@@ -270,5 +267,7 @@ class Fuzzer():
     def printTxList(txList):
         print("txList:")
         for i in range(len(txList)):
+            if not txList[i]:
+                continue
             print("[{}] payload: {}, sender: {}, value: {}".format(
                 str(i), txList[i].payload, txList[i].sender, txList[i].value))

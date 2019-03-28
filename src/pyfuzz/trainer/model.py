@@ -5,8 +5,7 @@ from pyfuzz.utils.utils import *
 from pyfuzz.config import TRAIN_CONFIG
 import os
 
-actionList = ["insertFirst", "insertLast", "removeFirst",
-              "removeLast", "modifyArgs", "modifySender", "modifyValue"]
+actionList = ["changeFunction", "modifyArgs", "modifySender", "modifyValue"]
 
 
 class Action:
@@ -18,7 +17,7 @@ class Action:
 class ActionProcessor:
     """
         map actions to integers
-        from 1 to maxFuncNum * 2 + maxCallNum * 3 + 2
+        from 1 to maxCallNum * 4
     """
 
     def __init__(self):
@@ -30,27 +29,12 @@ class ActionProcessor:
         actionId = actionObj.actionId
         actionArg = actionObj.actionArg
         assert(actionId >= 0 and actionId < len(actionList))
-        if actionId < 2:
-            assert(actionArg and actionArg >=
-                   0 and actionArg < self.maxFuncNum)
-            return actionId * self.maxFuncNum + actionArg
-        elif actionId < 4:
-            return 2 * self.maxFuncNum + (actionId - 2)
-        else:
-            assert(actionArg and actionArg >=
-                   0 and actionArg < self.maxCallNum)
-            return 2 * self.maxFuncNum + 2 + (actionId - 4) * self.maxCallNum + actionArg
+        assert(actionArg >=0 and actionArg < self.maxCallNum)
+        return actionArg * len(actionList) + actionId
 
     def decodeAction(self, action):
-        assert(action >= 0 and action <
-               self.maxFuncNum * 2 + self.maxCallNum * 3 + 2)
-        if action < 2 * self.maxFuncNum:
-            return Action(action // self.maxFuncNum, action % self.maxFuncNum)
-        elif action < 2 * self.maxFuncNum + 2:
-            return Action(action - 2 * self.maxFuncNum + 2, 0)
-        else:
-            action -= (2 * self.maxFuncNum + 2)
-            return Action(action // self.maxCallNum + 4, action % self.maxCallNum)
+        assert(action >= 0 and action < self.actionNum)
+        return Action(action % self.maxCallNum, action // self.maxCallNum)
 
 
 class State:
@@ -84,45 +68,45 @@ class StateProcessor:
         # encoding
         self.sequence = np.array([[0 for _ in range(self.seqLen)]], dtype=np.uint8)
 
-        for tx in txList:
-            if tx.hash in funcHashes:
-                funcHashes.remove(tx.hash)
-            
-            txLine = np.array([], dtype=np.uint8)
-            if tx.hash not in staticAnalysis.encoded_report:
-                txStatic = "0"
-            else:
-                txStatic = intListToHexString(staticAnalysis.encoded_report[tx.hash], staticAnalysis.token_size)
-            txStatic = hexToBinary(txStatic, size=self.seqLen)
-            txLine = np.append(txLine, txStatic)
-            # txLine = np.append(txLine, hexToBinary(tx.hash, 32))
-            txLine = np.append(txLine, hexToBinary(valueToHex32(tx.sender), 32))
-            txLine = np.append(txLine, hexToBinary(valueToHex32(tx.value), 32))
-
-            arg_1d_list = eval('[%s]'%repr(tx.args).replace('[', '').replace(']', ''))
-            for arg in arg_1d_list:
-                txLine = np.append(txLine, hexToBinary(valueToHex32(arg), 32))
-
-            if txLine.shape[0] < self.sequence.shape[1]:
-                txLine = np.append(txLine, hexToBinary(
-                    "0x0", self.sequence.shape[1] - txLine.shape[0]))
-            elif txLine.shape[0] > self.sequence.shape[1]:
-                txLine = txLine[:self.sequence.shape[1]]
-            # print(self.sequence.shape, np.expand_dims(txLine, axis=0).shape, txLine.shape)
-            self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
-
         while self.sequence.shape[0] < self.maxFuncNum + 1:
-            txLine = np.array([], dtype=np.uint8)
-            if len(funcHashes) > 0:
-                funcHash = funcHashes[0]
-                funcHashes.remove(funcHash)
-                txStatic = intListToHexString(staticAnalysis.encoded_report[funcHash], staticAnalysis.token_size)
+            for funcHash in funcHashes:
+                txLine = np.array([], dtype=np.uint8)
+                if funcHash not in staticAnalysis.encoded_report:
+                    txStatic = "0"
+                else:
+                    txStatic = intListToHexString(staticAnalysis.encoded_report[funcHash], staticAnalysis.token_size)
                 txStatic = hexToBinary(txStatic, size=self.seqLen)
                 txLine = np.append(txLine, txStatic)
-            if txLine.shape[0] < self.sequence.shape[1]:
-                txLine = np.append(txLine, hexToBinary(
-                    "0x00", self.sequence.shape[1] - txLine.shape[0]))
-            self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
+
+                position = []
+                for tx_i in range(len(txList)):
+                    if txList[tx_i] and txList[tx_i].hash == funcHash:
+                        position.append(1)
+                    else:
+                        position.append(0)
+                
+                # if the function has corresponding transactions
+                for pos in position:
+                    if pos:
+                        txLine = np.append(txLine, hexToBinary("0xff", 8))
+                    else:
+                        txLine = np.append(txLine, hexToBinary("0x00", 8))
+
+                # # do not add arguments
+                # txLine = np.append(txLine, hexToBinary(valueToHex32(tx.sender), 32))
+                # txLine = np.append(txLine, hexToBinary(valueToHex32(tx.value), 32))
+
+                # arg_1d_list = eval('[%s]'%repr(tx.args).replace('[', '').replace(']', ''))
+                # for arg in arg_1d_list:
+                #     txLine = np.append(txLine, hexToBinary(valueToHex32(arg), 32))
+
+                if txLine.shape[0] < self.sequence.shape[1]:
+                    txLine = np.append(txLine, hexToBinary(
+                        "0x0", self.sequence.shape[1] - txLine.shape[0]))
+                elif txLine.shape[0] > self.sequence.shape[1]:
+                    txLine = txLine[:self.sequence.shape[1]]
+
+                self.sequence = np.append(self.sequence, np.expand_dims(txLine, axis=0), axis=0)
         
         self.sequence = self.sequence[1:]
         self.sequence = np.expand_dims(self.sequence, axis=2)
