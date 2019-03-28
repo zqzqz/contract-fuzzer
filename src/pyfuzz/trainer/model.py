@@ -68,8 +68,10 @@ class StateProcessor:
         # encoding
         self.sequence = np.array([[0 for _ in range(self.seqLen)]], dtype=np.uint8)
 
-        while self.sequence.shape[0] < self.maxFuncNum + 1:
+        while self.sequence.shape[0] <= self.maxFuncNum:
             for funcHash in funcHashes:
+                if self.sequence.shape[0] > self.maxFuncNum:
+                    break
                 txLine = np.array([], dtype=np.uint8)
                 if funcHash not in staticAnalysis.encoded_report:
                     txStatic = "0"
