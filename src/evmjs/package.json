@@ -1,4 +1,8 @@
 {
+    "scripts": {
+        "start": "node index.js"
+    },
+
     "dependencies": {
         "@grpc/proto-loader": "^0.3.0",
         "async": "^2.6.1",
