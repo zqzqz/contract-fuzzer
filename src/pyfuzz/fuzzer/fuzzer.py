@@ -71,7 +71,7 @@ class Fuzzer():
             # the contract is in cache
             self.contract = self.contractMap[filename]["contract"]
             self.contractAbi = self.contractMap[filename]["abi"]
-            self.analysisAnalysisReport = self.contractMap[filename]["report"]
+            self.contractAnalysisReport = self.contractMap[filename]["report"]
         else:
             with open(filename, "r") as f:
                 source = f.read()
