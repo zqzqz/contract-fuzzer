@@ -226,6 +226,9 @@ class Fuzzer():
     def step(self, action):
         done = 0
         self.counter += 1
+        # testing
+        if self.counter >= FUZZ_CONFIG["max_attempt"]:
+            done = 1
         action = self.actionProcessor.decodeAction(action)
         nextState = self.mutate(self.state, action)
         if not nextState:
@@ -253,7 +256,7 @@ class Fuzzer():
                 reward += 1
                 report.append(Exploit(nextState.txList, bal-bal_p))
         # testing
-        if self.counter >= FUZZ_CONFIG["max_attempt"] or len(report) > 0:
+        if len(report) > 0:
             done = 1
         # update
         self.state = nextState
@@ -262,6 +265,21 @@ class Fuzzer():
         self.report = list(set(self.report + report))
         state, seqLen = self.stateProcessor.encodeState(self.state)
         return state, seqLen, reward, done
+
+    def coverage(self):
+        jump_cnt = 0
+        try:
+            code = self.contract["assembly"][".data"]["0"][".code"]
+            for pc in range(len(code)):
+                if code[pc]["name"][:4] == "JUMP":
+                    jump_cnt += 1
+        except:
+            pass
+        
+        if jump_cnt == 0:
+            return 1
+        else:
+            return len(self.contractMap[self.filename]["visited"]) / jump_cnt
 
     @staticmethod
     def printTxList(txList):

@@ -233,11 +233,11 @@ def train(datadir, episode_num=100, opts={}):
                         target_estimator=target_estimator,
                         experiment_dir=experiment_dir,
                         num_episodes=episode_num,
-                        replay_memory_size=1000,
-                        replay_memory_init_size=100,
-                        update_target_estimator_every=100,
+                        replay_memory_size=5000,
+                        replay_memory_init_size=500,
+                        update_target_estimator_every=500,
                         epsilon_start=1.0,
                         epsilon_end=0.1,
                         epsilon_decay_steps=5000,
                         discount_factor=0.99,
-                        batch_size=16)
+                        batch_size=32)

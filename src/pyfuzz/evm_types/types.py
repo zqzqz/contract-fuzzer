@@ -8,6 +8,7 @@ from pyfuzz.config import DIR_CONFIG
 from pyfuzz.utils.utils import hexCode, binaryToHex, hexToBinary
 
 logger = logging.getLogger("types")
+logger.setLevel(logging.INFO)
 
 # EVM Types
 type_list = {
@@ -29,6 +30,7 @@ for key in list(type_list.keys()):
 for i in range(1, 33):
     type_list["bytes" + str(i)] = {"type": "bytes", "size": i * 8}
 
+type_list["bytes"] = {"type": "bytes", "size": 256}
 type_list["payment"] = {"type": "uint", "size": 64}
 type_list["string"] = {"type": "bytes", "size": None}
 
@@ -77,7 +79,7 @@ class TypeHandler():
             res = "4" + res
         else:
             res = "8" + res
-        return res
+        return res or "0"
 
     def generateMinIntValue(self, size):
         hexStr = self.generateMinHexValue(size)
@@ -94,7 +96,7 @@ class TypeHandler():
             res = "7" + res
         else:
             res = "f" + res
-        return res
+        return res or "0"
 
     def generateMaxIntValue(self, size):
         hexStr = self.generateMaxHexValue(size)
@@ -110,11 +112,12 @@ class TypeHandler():
         selected_int = self.generateRandomIntValue(size)
         # remove "L" for python2
         hexStr = hex(selected_int).rstrip("L").lstrip("0x") or "0"
+        return hexStr
 
     def generateValueByType(self, _type, mode="random"):
         type_obj = self.type_list[_type]
         if type_obj == None:
-            logger.error("EVM type not found " + _type)
+            logger.error("EVM type {} not found ".format(_type))
             return None
         if mode not in self.mode_list:
             logger.error("Incorrect mode for generateValueByType.")
@@ -124,7 +127,6 @@ class TypeHandler():
         if mode == "seed" or _type == "address":
             type_seeds = self.seeds[_type]
             if type_seeds == None or len(type_seeds) == 0:
-                logger.error("Cannot find seeds for ", _type)
                 # generate random value if seeds are unavailable
                 mode = "random"
             else:
@@ -185,7 +187,7 @@ class TypeHandler():
             else:
                 logger.error("Incorrect mode for generateValueByType.")
                 return None
-            return "0x" + selected_hex
+            return bytearray.fromhex(selected_hex)
 
         elif type_obj["type"] == "bytes":
             num_size = type_obj["size"]
@@ -200,7 +202,7 @@ class TypeHandler():
             else:
                 logger.error("Incorrect mode for generateValueByType.")
                 return None
-            return "0x" + selected_hex
+            return bytearray.fromhex(selected_hex)
 
         elif type_obj["type"] == "array":
             array_len = random.randint(0, 3)

@@ -1,4 +1,4 @@
-import sys,os
+import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 from pyfuzz.analyzer.static_analyzer import *
 import slither
