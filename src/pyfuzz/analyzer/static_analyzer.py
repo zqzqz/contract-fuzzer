@@ -212,17 +212,20 @@ class StaticAnalyzer(IrAnalyzer):
 
         # encode each function arguments
         line_count = 0
+        call_flag_map = {}
         for report_line in contract.report:
             if line_count > self.max_line_num:
                 break
-            # remove function id from encoded report
+
             full_name = report_line["func"].full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
-            encoded_report[func_hash].append(get_code(full_name, func_map))
+            # encoded_report[func_hash].append(get_code(full_name, func_map))
             encoded_report[func_hash].append(
                 get_code(str(report_line["var"]), state_var_map))
             encoded_report[func_hash].append(
                 get_code(str(report_line["op"]), self.op_map))
+            if report_line["op"] != "write":
+                call_flag_map[func_hash] = True
 
             count = 0
             for dep in report_line["deps"]:
@@ -251,9 +254,15 @@ class StaticAnalyzer(IrAnalyzer):
                 encoded_report[func_hash] += [
                     0 for i in range(self.max_dep_num - count)]
 
-        for full_hash in encoded_report:
+        for func_hash in encoded_report:
+            if func_hash in call_flag_map and call_flag_map[func_hash]:
+                encoded_report[func_hash] = [self.max_token_value - 1] + encoded_report[func_hash]
+            else:
+                encoded_report[func_hash] = [0] + encoded_report[func_hash]
             if len(encoded_report[func_hash]) < self.max_length:
                 encoded_report[func_hash] += [0 for i in range(self.max_length - len(encoded_report[func_hash]))]
+            elif len(encoded_report[func_hash]) > self.max_length:
+                encoded_report[func_hash] = encoded_report[func_hash][:self.max_length]
 
         contract.encoded_report=encoded_report
         return encoded_report

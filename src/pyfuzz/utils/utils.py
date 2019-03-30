@@ -137,7 +137,7 @@ def intToHex(num, token_size):
     hex_num = hex(num).rstrip("L").lstrip("0x") or "0"
     hex_len = token_size // 4
     if len(hex_num) < hex_len:
-        hex_power = "0" * (hex_len - len(hex_num)) + hex_num
+        hex_num = "0" * (hex_len - len(hex_num)) + hex_num
     return hex_num[-hex_len:]
 
 def intListToHexString(int_list, token_size):

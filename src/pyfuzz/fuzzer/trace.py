@@ -1,6 +1,8 @@
 from pyfuzz.fuzzer.detector.detector import Detector
 from pyfuzz.config import FUZZ_CONFIG
 
+branch_op = ["JUMP", "JUMPI", "JUMPDEST", "STOP", "REVERT"]
+
 class TraceAnalyzer:
     def __init__(self):
         self.detector = Detector()
@@ -28,12 +30,12 @@ class TraceAnalyzer:
         ret_jumps = []
         for ptrace in ptraces:
             for state in ptrace:
-                if state["op"][:4] == "JUMP":
+                if state["op"] in branch_op:
                     pJumps.append(state["pc"])
         for ctrace in ctraces:
             tmp_jumps = []
             for state in ctrace:
-                if state["op"][:4] == "JUMP":
+                if state["op"] in branch_op:
                     tmp_jumps.append(state["pc"])
                     cJumps.append(state["pc"])
             ret_jumps.append(set(tmp_jumps))

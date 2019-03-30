@@ -12,11 +12,12 @@ def test():
     state, seqLen = fuzzer.reset()
     fuzzer.printTxList(fuzzer.state.txList)
     print("state", state.shape)
-    print("Mutate...")
-    state, seqLen, reward, done = fuzzer.step(0)
-    fuzzer.printTxList(fuzzer.state.txList)
-    print("state:", state.shape)
-    print("visited:", fuzzer.contractMap[filename]["visited"])
+    for i in range(TRAIN_CONFIG["action_num"]):
+        print("Mutate...")
+        state, seqLen, reward, done = fuzzer.step(i)
+        fuzzer.printTxList(fuzzer.state.txList)
+        print("state:", state.shape)
+        print("visited:", fuzzer.contractMap[filename]["visited"])
 
 def test_exploit(datadir):
     filename = os.path.join(datadir, '0x6f905E47d3e6A9Cc286b8250181Ee5A0441Acc81#PRESENT_1_ETH.sol')

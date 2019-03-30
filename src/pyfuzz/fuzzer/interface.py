@@ -5,12 +5,14 @@ from pyfuzz.config import FUZZ_CONFIG
 
 
 class Transaction:
-    def __init__(self, hash, args, value, sender, abi):
+    def __init__(self, hash, args, value, sender, abi, total_visited=0, tmp_visited=0):
         self.hash = hash
         self.args = args
         self.value = value
         self.sender = sender
         self.abi = abi
+        self.tmp_visited = tmp_visited
+        self.total_visited = total_visited
 
     @property
     def payload(self):
@@ -34,6 +36,9 @@ class Transaction:
     def __eq__(self, other):
         return self.__class__ == self.__class__ and self.__repr__() == self.__repr__()
 
+    def updateVisited(self):
+        self.tmp_visited += 1
+        self.total_visited += 1
 
 
 class ContractAbi:
@@ -43,6 +48,7 @@ class ContractAbi:
         self.funcHashList = []
         self.functionHashes = None
         self.typeHandler = TypeHandler()
+        self.visited = {}
         if contract != None:
             self.loadAbi(contract)
 
@@ -73,6 +79,7 @@ class ContractAbi:
             sig = hashes[name]
             if sig != None:
                 self.interface[sig] = abi
+                self.visited[sig] = 0
                 self.funcHashList.append(sig)
 
     def generateTxArgs(self, hash):
@@ -96,8 +103,14 @@ class ContractAbi:
         Input: function hash
         Output: transaction
     """
-
     def generateTx(self, hash, sender):
         args = self.generateTxArgs(hash)
         value = self.generateTxValue(hash)
-        return Transaction(hash, args, value, sender, self.interface[hash])
+        return Transaction(hash, args, value, sender, self.interface[hash], self.visited[hash])
+
+    def updateVisited(self, funcHash):
+        try:
+            self.visited[funcHash] += 1
+        except:
+            pass
+

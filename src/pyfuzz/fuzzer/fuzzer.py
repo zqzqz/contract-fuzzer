@@ -1,8 +1,8 @@
-from pyfuzz.evm.evm import *
+from pyfuzz.evm.evm import EvmHandler
 from pyfuzz.fuzzer.interface import ContractAbi, Transaction
-from pyfuzz.trainer.model import *
-from pyfuzz.fuzzer.trace import *
-from pyfuzz.analyzer.static_analyzer import *
+from pyfuzz.trainer.model import Action, ActionProcessor, State, StateProcessor
+from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
+from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
 from pyfuzz.fuzzer.exploit import Exploit
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
 
@@ -13,6 +13,7 @@ import os
 
 logger = logging.getLogger("Fuzzer")
 logger.setLevel(logging.INFO)
+
 
 class Fuzzer():
     def __init__(self, evmEndPoint=None, opts={}):
@@ -69,6 +70,7 @@ class Fuzzer():
         self.filename = filename
         if filename in self.contractMap:
             # the contract is in cache
+            self.contractMap[filename]["abi"].visited = 0
             self.contract = self.contractMap[filename]["contract"]
             self.contractAbi = self.contractMap[filename]["abi"]
             self.contractAnalysisReport = self.contractMap[filename]["report"]
@@ -109,13 +111,16 @@ class Fuzzer():
         for tx in txList:
             if not tx:
                 continue
+            tx.updateVisited()
+            self.contractMap[self.filename]["abi"].updateVisited(tx.hash)
             traces.append(self.runOneTx(tx))
         return traces
 
     def reward(self, traces):
-        reward, report, jump_pcs = self.traceAnalyzer.run(self.traces, traces, self.opts["vulnerability"])
+        reward, report, jump_pcs = self.traceAnalyzer.run(
+            self.traces, traces, self.opts["vulnerability"])
         self.traces = traces
-        
+
         return reward, report, jump_pcs
 
     def loadSeed(self, txList, pcs):
@@ -135,14 +140,15 @@ class Fuzzer():
             if not txList[i]:
                 continue
             if pcs[j].issubset(visitedPcList):
+                j += 1
                 continue
-            self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[j])
+            self.contractMap[self.filename]["visited"] = visitedPcList.union(
+                pcs[j])
             for arg in txList[i].typedArgs:
                 if arg[0] not in seeds:
                     seeds[arg[0]] = [arg[1]]
                 else:
                     seeds[arg[0]].append(arg[1])
-            j += 1
 
     def mutate(self, state, action):
         txList = state.txList + []
@@ -153,10 +159,12 @@ class Fuzzer():
             return None
         if txList[actionArg]:
             txHash = txList[actionArg].hash
-        
+
         # modify
         if actionId == 0:
             funcHash = txHash
+            if len(self.contractAbi.funcHashList) <= 0 or (len(self.contractAbi.funcHashList) == 1 and txHash in self.contractAbi.funcHashList):
+                return None
             attempt = 100
             while funcHash == txHash and attempt > 0:
                 funcHash = choice(self.contractAbi.funcHashList)
@@ -181,13 +189,15 @@ class Fuzzer():
             txList[actionArg].sender = sender
         elif actionId == 3:
             # modify value
+            if txHash == None:
+                return None
             if not self.contractAbi.interface[txHash]['payable']:
                 # not payable function
                 return None
             value = state.txList[actionArg].value
             attempt = 100
             while value == state.txList[actionArg].value and attempt > 0:
-                value = self.contractAbi.generateTxValue(funcHash)
+                value = self.contractAbi.generateTxValue(txHash)
                 attempt -= 1
             txList[actionArg].value = value
         else:
@@ -204,7 +214,8 @@ class Fuzzer():
             return
         self.contractAddress = self.evm.deploy(self.contract)
 
-        self.state = State(self.contractAnalysisReport, [None for i in range(self.maxCallNum)])
+        self.state = State(self.contractAnalysisReport, [
+                           None for i in range(self.maxCallNum)])
         self.traces = []
         self.report = []
         state, seqLen = self.stateProcessor.encodeState(self.state)
@@ -217,10 +228,10 @@ class Fuzzer():
         contract_files = os.listdir(datadir)
         filename = choice(contract_files)
         state, seq_len = self.contract_reset(datadir, filename)
-        while tmp_state == None:
+        while seq_len == None:
             filename = choice(contract_files)
             state, seq_len = self.contract_reset(datadir, filename)
-        return state, seqLen, filename
+        return state, seq_len, filename
 
     def contract_reset(self, datadir, filename):
         """
@@ -289,11 +300,11 @@ class Fuzzer():
         try:
             code = self.contract["assembly"][".data"]["0"][".code"]
             for pc in range(len(code)):
-                if code[pc]["name"][:4] == "JUMP":
+                if code[pc]["name"][:4] in branch_op:
                     jump_cnt += 1
         except:
             pass
-        
+
         if jump_cnt == 0:
             return 1
         else:
@@ -305,5 +316,5 @@ class Fuzzer():
         for i in range(len(txList)):
             if not txList[i]:
                 continue
-            print("[{}] payload: {}, sender: {}, value: {}".format(
-                str(i), txList[i].payload, txList[i].sender, txList[i].value))
+            print("[{}] payload: {}, sender: {}, value: {}, visited: {}, total_visited: {}".format(
+                str(i), txList[i].payload, txList[i].sender, txList[i].value, txList[i].tmp_visited, txList[i].total_visited))
