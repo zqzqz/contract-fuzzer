@@ -28,7 +28,8 @@ class AnalysisReport():
         self.max_line_num = ANALYSIS_CONFIG["max_line_num"]
         self.max_length = ANALYSIS_CONFIG["max_length"]
         for function in contract.functions:
-            if function.visibility != "public":
+            if not(function.visibility in ["public","external"]):
+            # if function.visibility != "public":
                 continue
             full_name = function.full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
