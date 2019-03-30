@@ -43,7 +43,7 @@ class StaticAnalyzer(IrAnalyzer):
         self.max_line_num = ANALYSIS_CONFIG["max_line_num"]
         self.max_token_value = 2 ** self.token_size
         self.max_length = ANALYSIS_CONFIG["max_length"]
-        self.op_map = {"write": 1, "call": 2}
+        self.op_map = {"write": 1, "transfer": 2, "send": 2, "value": 3}
         self.solidity_var_map = {"msg.sender": 1, "msg.value": 2}
         self.report = None
 
@@ -88,14 +88,18 @@ class StaticAnalyzer(IrAnalyzer):
         '''
         add external_calls into report
         here only consider about send and transfer with certain format args
+        comments: must include low level calls, which is the critical entry to attacks
         '''
         for ex_call in function._external_calls_as_expressions:
             try:
                 op = ex_call.called.member_name
-                if op in ["transfer","send"]:
-                    _to = ex_call.called.expression.value # address, like msg.sender
+                if op in ["send", "transfer", "value"]:
+                    _to = ex_call.called.expression
+                    while isinstance(_to, slither.core.expressions.member_access.MemberAccess):
+                        _to = _to.expression
+                    _to = _to.value # address, like msg.sender
                     # format like: msg.sender.transfer(payments[msg.sender]);
-                    if (type(ex_call.arguments[0])==slither.core.expressions.index_access.IndexAccess):
+                    if isinstance(ex_call.arguments[0], slither.core.expressions.index_access.IndexAccess):
                         index_left = ex_call.arguments[0].expression_left.value  # state value
                         index_right = ex_call.arguments[0].expression_right.value  # state value
                         function.report.append({
@@ -211,6 +215,7 @@ class StaticAnalyzer(IrAnalyzer):
         for report_line in contract.report:
             if line_count > self.max_line_num:
                 break
+            # remove function id from encoded report
             full_name = report_line["func"].full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
             encoded_report[func_hash].append(get_code(full_name, func_map))
@@ -218,6 +223,7 @@ class StaticAnalyzer(IrAnalyzer):
                 get_code(str(report_line["var"]), state_var_map))
             encoded_report[func_hash].append(
                 get_code(str(report_line["op"]), self.op_map))
+
             count = 0
             for dep in report_line["deps"]:
                 if count > self.max_dep_num:
@@ -229,7 +235,7 @@ class StaticAnalyzer(IrAnalyzer):
 
                 # it is state variable
                 if not code:
-                    code = get_code(str(dep), self.solidity_var_map)
+                    code = get_code(str(dep), state_var_map)
 
                 # it is function parameters
                 if not code:

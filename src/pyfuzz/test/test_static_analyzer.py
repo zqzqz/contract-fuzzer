@@ -8,7 +8,8 @@ def test():
     report = analyzer.run(debug=1)
     print("function mapping:", report.func_map)
     def function_visitor(function):
-        print(function.full_name, function.taintList)
+        print(function.full_name, end='')
+        print([str(t) for t in function.taintList])
     analyzer.parse_contracts(Visitor(function_visitor=function_visitor))
 
 if __name__ == "__main__":
