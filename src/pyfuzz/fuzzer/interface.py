@@ -66,6 +66,8 @@ class ContractAbi:
         for abi in solcAbi:
             if abi["type"] != "function":
                 continue
+            if abi["stateMutability"]=="view":
+                continue
 
             name = abi["name"]
             name += '('
