@@ -47,23 +47,29 @@ def fuzz(datadir, rand_prob, opts):
         contract_files = os.listdir(datadir)
         for filename in contract_files:
             full_filename = os.path.join(datadir, filename)
-            contract_name = filename.split('.')[0].split("#")[1]
-            env.loadContract(full_filename, contract_name)
+            contract_name = filename.split('.')[0].split("#")[-1]
+            
+            if not env.loadContract(full_filename, contract_name):
+                continue
 
             state, seq_len = env.reset()
             while True:
                 logger.info(env.state.txList)
 
-                feed_dict = {X: np.expand_dims(
-                    state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
-                q_values = sess.run(predictions, feed_dict)[0]
-                action_probs = np.ones(
-                    actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
-                best_action = np.argmax(q_values)
-                action_probs[best_action] += (1.0 - rand_prob)
-                action = np.random.choice(
-                    np.arange(len(action_probs)), p=action_probs)
-                state, seq_len, reward, done = env.step(action)
+                try:
+                    feed_dict = {X: np.expand_dims(
+                        state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
+                    q_values = sess.run(predictions, feed_dict)[0]
+                    action_probs = np.ones(
+                        actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
+                    best_action = np.argmax(q_values)
+                    action_probs[best_action] += (1.0 - rand_prob)
+                    action = np.random.choice(
+                        np.arange(len(action_probs)), p=action_probs)
+                    state, seq_len, reward, done = env.step(action)
+                except Exception as e:
+                    logger.error("__main__.fuzz: {}".format(str(e)))
+                    reward, done = 0, 0
 
                 if done:
                     logger.info("contract {} finished".format(filename))
@@ -106,8 +112,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
         contract_files = os.listdir(datadir)
         for filename in contract_files:
             full_filename = os.path.join(datadir, filename)
-            contract_name = filename.split('.')[0].split("#")[1]
-            env.loadContract(full_filename, contract_name)
+            contract_name = filename.split('.')[0].split("#")[-1]
 
             if filename not in report:
                 report[filename] = {
@@ -115,19 +120,27 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                     "failure": []
                 }
 
+            if not env.loadContract(full_filename, contract_name):
+                continue
+
             for i in range(repeat_num):
                 state, seq_len = env.reset()
                 while True:
-                    feed_dict = {X: np.expand_dims(
-                        state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
-                    q_values = sess.run(predictions, feed_dict)[0]
-                    action_probs = np.ones(
-                        actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
-                    best_action = np.argmax(q_values)
-                    action_probs[best_action] += (1.0 - rand_prob)
-                    action = np.random.choice(
-                        np.arange(len(action_probs)), p=action_probs)
-                    state, seq_len, reward, done = env.step(action)
+                    try:
+                        feed_dict = {X: np.expand_dims(
+                            state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
+                        q_values = sess.run(predictions, feed_dict)[0]
+                        action_probs = np.ones(
+                            actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
+                        best_action = np.argmax(q_values)
+                        action_probs[best_action] += (1.0 - rand_prob)
+                        action = np.random.choice(
+                            np.arange(len(action_probs)), p=action_probs)
+                        state, seq_len, reward, done = env.step(action)
+
+                    except Exception as e:
+                        logger.error("__main__.baseline: {}".format(str(e)))
+                        reward, done = 0, 0
 
                     if done:
                         logger.info("contract {} finished with counter {}".format(

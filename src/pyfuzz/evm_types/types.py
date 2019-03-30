@@ -3,6 +3,7 @@ import os
 import codecs
 import random
 import json
+import string
 
 from pyfuzz.config import DIR_CONFIG
 from pyfuzz.utils.utils import hexCode, binaryToHex, hexToBinary
@@ -32,7 +33,7 @@ for i in range(1, 33):
 
 type_list["bytes"] = {"type": "bytes", "size": 256}
 type_list["payment"] = {"type": "uint", "size": 64}
-type_list["string"] = {"type": "bytes", "size": None}
+type_list["string"] = {"type": "string", "size": None}
 
 
 mode_list = [
@@ -114,6 +115,10 @@ class TypeHandler():
         hexStr = hex(selected_int).rstrip("L").lstrip("0x") or "0"
         return hexStr
 
+    def generateRandomString(self, size):
+        slen = size // 8
+        return ''.join(random.sample(string.printable, slen))
+
     def generateValueByType(self, _type, mode="random"):
         type_obj = self.type_list[_type]
         if type_obj == None:
@@ -124,7 +129,7 @@ class TypeHandler():
             return None
         
         # seed mode
-        if mode == "seed" or _type == "address":
+        if (mode == "seed" or _type == "address") and type_obj["type"] != "array":
             type_seeds = self.seeds[_type]
             if type_seeds == None or len(type_seeds) == 0:
                 # generate random value if seeds are unavailable
@@ -194,7 +199,7 @@ class TypeHandler():
             if num_size == None:
                 num_size = random.randint(0, 32) * 8
             if mode == "min":
-                selected_hex = self.generateMinHexValue(8)
+                selected_hex = self.generateMinHexValue(num_size)
             elif mode == "max":
                 selected_hex = self.generateMaxHexValue(num_size)
             elif mode == "random":
@@ -203,6 +208,19 @@ class TypeHandler():
                 logger.error("Incorrect mode for generateValueByType.")
                 return None
             return bytearray.fromhex(selected_hex)
+
+        elif type_obj["type"] == "string":
+            num_size = random.randint(0, 32) * 8
+            if mode == "min":
+                selected_str = self.generateRandomString(num_size)
+            elif mode == "max":
+                selected_str = self.generateRandomString(num_size)
+            elif mode == "random":
+                selected_str = self.generateRandomString(num_size)
+            else:
+                logger.error("Incorrect mode for generateValueByType.")
+                return None
+            return selected_str
 
         elif type_obj["type"] == "array":
             array_len = random.randint(0, 3)

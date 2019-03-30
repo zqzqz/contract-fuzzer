@@ -19,7 +19,7 @@ class Fuzzer():
         # load config
         self.opts = opts
         if "exploit" not in opts:
-            self.opts["exploit"] = True
+            self.opts["exploit"] = False
         if "vulnerability" not in opts:
             self.opts["vulnerability"] = False
         # init evm handler
@@ -71,23 +71,29 @@ class Fuzzer():
             # the contract is in cache
             self.contract = self.contractMap[filename]["contract"]
             self.contractAbi = self.contractMap[filename]["abi"]
-            self.analysisAnalysisReport = self.contractMap[filename]["report"]
+            self.contractAnalysisReport = self.contractMap[filename]["report"]
+            return True
         else:
-            with open(filename, "r") as f:
-                source = f.read()
-            self.contract = self.evm.compile(source, contract_name)
-            self.contractAbi = ContractAbi(self.contract)
-            # run static analysis
-            self.staticAnalyzer.load_contract(filename, contract_name)
-            self.contractAnalysisReport = self.staticAnalyzer.run()
-            # set cache
-            self.contractMap[filename] = {
-                "name": contract_name,
-                "contract": self.contract,
-                "abi": self.contractAbi,
-                "report": self.contractAnalysisReport,
-                "visited": set([])
-            }
+            try:
+                with open(filename, "r") as f:
+                    source = f.read()
+                self.contract = self.evm.compile(source, contract_name)
+                self.contractAbi = ContractAbi(self.contract)
+                # run static analysis
+                self.staticAnalyzer.load_contract(filename, contract_name)
+                self.contractAnalysisReport = self.staticAnalyzer.run()
+                # set cache
+                self.contractMap[filename] = {
+                    "name": contract_name,
+                    "contract": self.contract,
+                    "abi": self.contractAbi,
+                    "report": self.contractAnalysisReport,
+                    "visited": set([])
+                }
+                return True
+            except Exception as e:
+                logger.error("fuzz.loadContract: {}".format(str(e)))
+                return False
 
     def runOneTx(self, tx):
         if self.contract == None:
@@ -210,7 +216,10 @@ class Fuzzer():
         """
         contract_files = os.listdir(datadir)
         filename = choice(contract_files)
-        state, seqLen = self.contract_reset(datadir, filename)
+        state, seq_len = self.contract_reset(datadir, filename)
+        while tmp_state == None:
+            filename = choice(contract_files)
+            state, seq_len = self.contract_reset(datadir, filename)
         return state, seqLen, filename
 
     def contract_reset(self, datadir, filename):
@@ -219,52 +228,61 @@ class Fuzzer():
         """
         assert(filename != None)
         full_filename = os.path.join(datadir, filename)
-        contract_name = filename.split('.')[0].split("#")[1]
-        self.loadContract(full_filename, contract_name)
-        return self.reset()
+        # todo: this is only proper for our dataset
+        contract_name = filename.split('.')[0].split("#")[-1]
+        if self.loadContract(full_filename, contract_name):
+            return self.reset()
+        else:
+            return None, None
 
     def step(self, action):
         done = 0
         self.counter += 1
-        # testing
-        if self.counter >= FUZZ_CONFIG["max_attempt"]:
-            done = 1
-        action = self.actionProcessor.decodeAction(action)
-        nextState = self.mutate(self.state, action)
-        if not nextState:
-            state, seqLen = self.stateProcessor.encodeState(self.state)
-            return state, seqLen, 0, done
-        # execute transactions
-        traces = self.runTxs(nextState.txList)
-        # get reward of executions
-        reward, report, pcs = self.reward(traces)
-        # bonus for valid mutation
-        reward += FUZZ_CONFIG["valid_mutation_reward"]
-        # update seeds
-        self.loadSeed(nextState.txList, pcs)
-        # check whether exploitation happens
-        if self.opts["exploit"]:
-            self.accounts = self.evm.getAccounts()
-            # balance increase
-            bal_p = 0
-            bal = 0
-            for acc in self.accounts.keys():
-                bal_p += int(FUZZ_CONFIG["account_balance"], 16)
-                bal += int(self.accounts[acc], 16)
+        reward = 0
+        try:
+            # testing
+            if self.counter >= FUZZ_CONFIG["max_attempt"]:
+                done = 1
+            action = self.actionProcessor.decodeAction(action)
+            nextState = self.mutate(self.state, action)
+            if not nextState:
+                state, seqLen = self.stateProcessor.encodeState(self.state)
+                return state, seqLen, reward, done
+            # execute transactions
+            traces = self.runTxs(nextState.txList)
+            # get reward of executions
+            reward, report, pcs = self.reward(traces)
+            # bonus for valid mutation
+            reward += FUZZ_CONFIG["valid_mutation_reward"]
+            # update seeds
+            self.loadSeed(nextState.txList, pcs)
+            # check whether exploitation happens
+            if self.opts["exploit"]:
+                self.accounts = self.evm.getAccounts()
+                # balance increase
+                bal_p = 0
+                bal = 0
+                for acc in self.accounts.keys():
+                    bal_p += int(FUZZ_CONFIG["account_balance"], 16)
+                    bal += int(self.accounts[acc], 16)
 
-            if bal > bal_p:
-                reward += 1
-                report.append(Exploit(nextState.txList, bal-bal_p))
-        # testing
-        if len(report) > 0:
-            done = 1
-        # update
-        self.state = nextState
-        self.traces = traces
-        # should exclude repeated reports
-        self.report = list(set(self.report + report))
-        state, seqLen = self.stateProcessor.encodeState(self.state)
-        return state, seqLen, reward, done
+                if bal > bal_p:
+                    reward += FUZZ_CONFIG["exploit_reward"]
+                    report.append(Exploit(nextState.txList, bal-bal_p))
+            # testing
+            if len(report) > 0:
+                done = 1
+            # update
+            self.state = nextState
+            self.traces = traces
+            # should exclude repeated reports
+            self.report = list(set(self.report + report))
+            state, seqLen = self.stateProcessor.encodeState(self.state)
+            return state, seqLen, reward, done
+        except Exception as e:
+            logger.error("fuzzer.step: {}".format(str(e)))
+            state, seqLen = self.stateProcessor.encodeState(self.state)
+            return state, seqLen, reward, done
 
     def coverage(self):
         jump_cnt = 0

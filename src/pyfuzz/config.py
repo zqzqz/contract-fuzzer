@@ -22,7 +22,7 @@ FUZZ_CONFIG = {
     "seed_prob": 0.4,
     "random_action_prob": 0.4,
     "account_balance": "0xfffffffffffffffffffffffffffffff",
-    "max_attempt": 1000,
+    "max_attempt": 10,
     "valid_mutation_reward": 1,
     "vulnerability_reward": 1,
     "exploit_reward": 2,
