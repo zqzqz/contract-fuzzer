@@ -37,6 +37,7 @@ EVMHandler = {
   accounts: {},
   defaultAccount: null,
   contracts: {},
+  defaultContractAddress: "",
   // currently use web3 as utils
   web3: new Web3(),
   // a nonce
@@ -150,15 +151,19 @@ EVMHandler = {
     return new Promise((resolve, reject) => {
       EVMHandler.resetBalance(EVMHandler.defaultBalance).then(() => {
         let accs = Object.keys(EVMHandler.accounts)
-        EVMHandler.sendTx(EVMHandler.defaultAccount, "", "0", contract.bytecode).then((result) => {
-          if (!result.createdAddress) reject(Error("Invalid contract address"));
-          let contractAddress = result.createdAddress.toString("hex")
+        EVMHandler.sendTx(EVMHandler.defaultAccount, EVMHandler.defaultContractAddress, "0", contract.bytecode).then((result) => {
+          if (result.createdAddress) {
+            EVMHandler.defaultContractAddress = result.createdAddress.toString("hex")
+          }
+          let contractAddress = EVMHandler.defaultContractAddress;
+          result.address = contractAddress;
+          if (!contractAddress || contractAddress == "") reject(Error("Invalid contract address"));
           EVMHandler.contracts[contractAddress] = contract;
           // init balance for newly deployed contracts
-          let account = EVMHandler.stateTrie.get(result.createdAddress, (err, accData) => {
+          let account = EVMHandler.stateTrie.get(contractAddress, (err, accData) => {
             let account = new Account(accData);
             account.balance = "0xffffffffffffffffffffffff";
-            EVMHandler.stateTrie.put(result.createdAddress, account.serialize(), () => {
+            EVMHandler.stateTrie.put(contractAddress, account.serialize(), () => {
               resolve(result);
             })
           });

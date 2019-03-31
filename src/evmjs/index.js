@@ -60,7 +60,7 @@ async function deployWrapper(call) {
     contract = JSON.parse(call.request.data);
     let res = await evmHandler.deploy(contract)
     call.write({
-      address: res.createdAddress.toString("hex")
+      address: res.address
     });
     call.end();
   } catch (err) {
