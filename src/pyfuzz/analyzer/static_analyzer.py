@@ -20,8 +20,6 @@ def print_reports(reports):
 class AnalysisReport():
     def __init__(self, contract):
         self.contract = contract
-        self.report = contract.report
-        self.encoded_report = contract.encoded_report
         self.func_map = {}
         self.token_size = ANALYSIS_CONFIG["token_size"]
         self.max_dep_num = ANALYSIS_CONFIG["max_dep_num"]
@@ -29,11 +27,18 @@ class AnalysisReport():
         self.max_length = ANALYSIS_CONFIG["max_length"]
         for function in contract.functions:
             if not(function.visibility in ["public","external"]):
-            # if function.visibility != "public":
                 continue
             full_name = function.full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
             self.func_map[func_hash] = function.encode_id
+
+    @property
+    def report(self):
+        return self.contract.report
+
+    @property
+    def encoded_report(self):
+        return self.contract.encoded_report
 
 
 class StaticAnalyzer(IrAnalyzer):
@@ -265,7 +270,7 @@ class StaticAnalyzer(IrAnalyzer):
             elif len(encoded_report[func_hash]) > self.max_length:
                 encoded_report[func_hash] = encoded_report[func_hash][:self.max_length]
 
-        contract.encoded_report=encoded_report
+        contract.encoded_report = encoded_report
         return encoded_report
 
     # add property and method to function object

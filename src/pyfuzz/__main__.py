@@ -7,6 +7,7 @@ import argparse
 import logging
 import sys
 import json
+import random
 
 logging.basicConfig()
 logger = logging.getLogger("pyfuzz")
@@ -37,12 +38,13 @@ def fuzz(datadir, rand_prob, opts):
         saver = tf.train.import_meta_graph(checkpoint_path)
         saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
 
-        graph = tf.get_default_graph()
-        predictions = graph.get_tensor_by_name(
-            "target_q/CNN/predictions:0")
-        X = graph.get_tensor_by_name("target_q/X:0")
-        real_seq_length = graph.get_tensor_by_name(
-            "target_q/real_seq_length:0")
+        if rand_prob < 1.0:
+            graph = tf.get_default_graph()
+            predictions = graph.get_tensor_by_name(
+                "target_q/CNN/predictions:0")
+            X = graph.get_tensor_by_name("target_q/X:0")
+            real_seq_length = graph.get_tensor_by_name(
+                "target_q/real_seq_length:0")
 
         contract_files = os.listdir(datadir)
         for filename in contract_files:
@@ -57,15 +59,18 @@ def fuzz(datadir, rand_prob, opts):
                 logger.info(env.state.txList)
 
                 try:
-                    feed_dict = {X: np.expand_dims(
-                        state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
-                    q_values = sess.run(predictions, feed_dict)[0]
-                    action_probs = np.ones(
-                        actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
-                    best_action = np.argmax(q_values)
-                    action_probs[best_action] += (1.0 - rand_prob)
-                    action = np.random.choice(
-                        np.arange(len(action_probs)), p=action_probs)
+                    if rand_prob < 1.0:
+                        feed_dict = {X: np.expand_dims(
+                            state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
+                        q_values = sess.run(predictions, feed_dict)[0]
+                        action_probs = np.ones(
+                            actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
+                        best_action = np.argmax(q_values)
+                        action_probs[best_action] += (1.0 - rand_prob)
+                        action = np.random.choice(
+                            np.arange(len(action_probs)), p=action_probs)
+                    else:
+                        action = random.randint(0, TRAIN_CONFIG["action_num"]-1)
                     state, seq_len, reward, done = env.step(action)
                 except Exception as e:
                     logger.error("__main__.fuzz: {}".format(str(e)))
@@ -96,18 +101,22 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
     checkpoint_path = os.path.join(checkpoint_dir, "model.meta")
 
     report = {}
+    if os.path.isfile(output):
+        with open(output, "r") as f:
+            report = json.load(f)
 
     with tf.Session() as sess:
         # First let's load meta graph and restore weights
         saver = tf.train.import_meta_graph(checkpoint_path)
         saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
 
-        graph = tf.get_default_graph()
-        predictions = graph.get_tensor_by_name(
-            "target_q/CNN/predictions:0")
-        X = graph.get_tensor_by_name("target_q/X:0")
-        real_seq_length = graph.get_tensor_by_name(
-            "target_q/real_seq_length:0")
+        if rand_prob < 1.0:
+            graph = tf.get_default_graph()
+            predictions = graph.get_tensor_by_name(
+                "target_q/CNN/predictions:0")
+            X = graph.get_tensor_by_name("target_q/X:0")
+            real_seq_length = graph.get_tensor_by_name(
+                "target_q/real_seq_length:0")
 
         contract_files = os.listdir(datadir)
         for filename in contract_files:
@@ -119,6 +128,8 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                     "success": [],
                     "failure": []
                 }
+            else:
+                continue
 
             if not env.loadContract(full_filename, contract_name):
                 continue
@@ -127,15 +138,18 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                 state, seq_len = env.reset()
                 while True:
                     try:
-                        feed_dict = {X: np.expand_dims(
-                            state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
-                        q_values = sess.run(predictions, feed_dict)[0]
-                        action_probs = np.ones(
-                            actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
-                        best_action = np.argmax(q_values)
-                        action_probs[best_action] += (1.0 - rand_prob)
-                        action = np.random.choice(
-                            np.arange(len(action_probs)), p=action_probs)
+                        if rand_prob < 1.0:
+                            feed_dict = {X: np.expand_dims(
+                                state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
+                            q_values = sess.run(predictions, feed_dict)[0]
+                            action_probs = np.ones(
+                                actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
+                            best_action = np.argmax(q_values)
+                            action_probs[best_action] += (1.0 - rand_prob)
+                            action = np.random.choice(
+                                np.arange(len(action_probs)), p=action_probs)
+                        else:
+                            action = random.randint(0, TRAIN_CONFIG["action_num"]-1)
                         state, seq_len, reward, done = env.step(action)
 
                     except Exception as e:
@@ -172,9 +186,9 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
             else:
                 report[filename]["failure_coverage"] = 0
 
-    with open(output, "w") as f:
-        json.dump(report, f, indent=4)
-        logger.info("Result written")
+            with open(output, "w") as f:
+                json.dump(report, f, indent=4)
+                logger.info("Result written")
 
 
 def main():
