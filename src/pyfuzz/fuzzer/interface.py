@@ -116,3 +116,7 @@ class ContractAbi:
         except:
             pass
 
+    def resetVisited(self):
+        for funcHash in self.interface:
+            self.visited[funcHash] = 0
+

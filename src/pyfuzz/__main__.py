@@ -29,16 +29,17 @@ def fuzz(datadir, rand_prob, opts):
     # q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir, action_num=actionProcessor.actionNum)
     # target_estimator = Estimator(scope="target_q")
 
-    # Create directories for checkpoints and summaries
-    checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
-    checkpoint_path = os.path.join(checkpoint_dir, "model.meta")
+    if rand_prob < 1.0:
+        # Create directories for checkpoints and summaries
+        checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
+        checkpoint_path = os.path.join(checkpoint_dir, "model.meta")
 
     with tf.Session() as sess:
-        # First let's load meta graph and restore weights
-        saver = tf.train.import_meta_graph(checkpoint_path)
-        saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
-
         if rand_prob < 1.0:
+            # First let's load meta graph and restore weights
+            saver = tf.train.import_meta_graph(checkpoint_path)
+            saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
+
             graph = tf.get_default_graph()
             predictions = graph.get_tensor_by_name(
                 "target_q/CNN/predictions:0")
@@ -96,9 +97,10 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
     # q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir, action_num=actionProcessor.actionNum)
     # target_estimator = Estimator(scope="target_q")
 
-    # Create directories for checkpoints and summaries
-    checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
-    checkpoint_path = os.path.join(checkpoint_dir, "model.meta")
+    if rand_prob < 1.0:
+        # Create directories for checkpoints and summaries
+        checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
+        checkpoint_path = os.path.join(checkpoint_dir, "model.meta")
 
     report = {}
     if os.path.isfile(output):
@@ -106,11 +108,11 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
             report = json.load(f)
 
     with tf.Session() as sess:
-        # First let's load meta graph and restore weights
-        saver = tf.train.import_meta_graph(checkpoint_path)
-        saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
-
         if rand_prob < 1.0:
+            # First let's load meta graph and restore weights
+            saver = tf.train.import_meta_graph(checkpoint_path)
+            saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
+
             graph = tf.get_default_graph()
             predictions = graph.get_tensor_by_name(
                 "target_q/CNN/predictions:0")

@@ -70,7 +70,7 @@ class Fuzzer():
         self.filename = filename
         if filename in self.contractMap:
             # the contract is in cache
-            self.contractMap[filename]["abi"].visited = 0
+            self.contractMap[filename]["abi"].resetVisited()
             self.contract = self.contractMap[filename]["contract"]
             self.contractAbi = self.contractMap[filename]["abi"]
             self.contractAnalysisReport = self.contractMap[filename]["report"]
