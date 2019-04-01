@@ -253,50 +253,50 @@ class Fuzzer():
         done = 0
         self.counter += 1
         reward = 0
-        # try:
-        # testing
-        if self.counter >= FUZZ_CONFIG["max_attempt"]:
-            done = 1
-        action = self.actionProcessor.decodeAction(action)
-        nextState = self.mutate(self.state, action)
-        if not nextState:
+        try:
+            # testing
+            if self.counter >= FUZZ_CONFIG["max_attempt"]:
+                done = 1
+            action = self.actionProcessor.decodeAction(action)
+            nextState = self.mutate(self.state, action)
+            if not nextState:
+                state, seqLen = self.stateProcessor.encodeState(self.state)
+                return state, seqLen, reward, done
+            # execute transactions
+            traces = self.runTxs(nextState.txList)
+            # get reward of executions
+            reward, report, pcs = self.reward(traces)
+            # bonus for valid mutation
+            reward += FUZZ_CONFIG["valid_mutation_reward"]
+            # update seeds
+            self.loadSeed(nextState.txList, pcs)
+            # check whether exploitation happens
+            if self.opts["exploit"]:
+                self.accounts = self.evm.getAccounts()
+                # balance increase
+                bal_p = 0
+                bal = 0
+                for acc in self.accounts.keys():
+                    bal_p += int(FUZZ_CONFIG["account_balance"], 16)
+                    bal += int(self.accounts[acc], 16)
+
+                if bal > bal_p:
+                    reward += FUZZ_CONFIG["exploit_reward"]
+                    report.append(Exploit(nextState.txList, bal-bal_p))
+            # testing
+            if len(report) > 0:
+                done = 1
+            # update
+            self.state = nextState
+            self.traces = traces
+            # should exclude repeated reports
+            self.report = list(set(self.report + report))
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, reward, done
-        # execute transactions
-        traces = self.runTxs(nextState.txList)
-        # get reward of executions
-        reward, report, pcs = self.reward(traces)
-        # bonus for valid mutation
-        reward += FUZZ_CONFIG["valid_mutation_reward"]
-        # update seeds
-        self.loadSeed(nextState.txList, pcs)
-        # check whether exploitation happens
-        if self.opts["exploit"]:
-            self.accounts = self.evm.getAccounts()
-            # balance increase
-            bal_p = 0
-            bal = 0
-            for acc in self.accounts.keys():
-                bal_p += int(FUZZ_CONFIG["account_balance"], 16)
-                bal += int(self.accounts[acc], 16)
-
-            if bal > bal_p:
-                reward += FUZZ_CONFIG["exploit_reward"]
-                report.append(Exploit(nextState.txList, bal-bal_p))
-        # testing
-        if len(report) > 0:
-            done = 1
-        # update
-        self.state = nextState
-        self.traces = traces
-        # should exclude repeated reports
-        self.report = list(set(self.report + report))
-        state, seqLen = self.stateProcessor.encodeState(self.state)
-        return state, seqLen, reward, done
-        # except Exception as e:
-        #     logger.error("fuzzer.step: {}".format(str(e)))
-        #     state, seqLen = self.stateProcessor.encodeState(self.state)
-        #     return state, seqLen, 0, 1
+        except Exception as e:
+            logger.error("fuzzer.step: {}".format(str(e)))
+            state, seqLen = self.stateProcessor.encodeState(self.state)
+            return state, seqLen, 0, 1
 
     def coverage(self):
         jump_cnt = 0
