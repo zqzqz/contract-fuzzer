@@ -55,10 +55,7 @@ EVMHandler = {
         EVMHandler.web3vm = new remixLib.vm.Web3VMProvider()
         EVMHandler.web3vm.setVM(EVMHandler.vm)
         EVMHandler.debugger = new Debugger({
-          web3: EVMHandler.web3vm,
-          compilationResult: function () {
-            return true
-          }
+          web3: EVMHandler.web3vm
         })
         EVMHandler.startTime = new Date().getTime() / 1000 | 0
         EVMHandler.txCnt = 0
@@ -152,27 +149,24 @@ EVMHandler = {
       EVMHandler.resetBalance(EVMHandler.defaultBalance).then(() => {
         let accs = Object.keys(EVMHandler.accounts)
         EVMHandler.sendTx(EVMHandler.defaultAccount, EVMHandler.defaultContractAddress, "0", contract.bytecode).then((result) => {
+          if (!result.createdAddress && (!EVMHandler.defaultContractAddress || EVMHandler.defaultContractAddress == ""))
+            reject(Error("Invalid contract address"));
           if (result.createdAddress) {
-            EVMHandler.defaultContractAddress = result.createdAddress.toString("hex")
+            result.address = utileth.bufferToHex(result.createdAddress);
+            EVMHandler.defaultContractAddress = result.address;
           }
-          let contractAddress = EVMHandler.defaultContractAddress;
-          result.address = contractAddress;
-          if (!contractAddress || contractAddress == "") reject(Error("Invalid contract address"));
-          EVMHandler.contracts[contractAddress] = contract;
+          else {
+            result.address = EVMHandler.defaultContractAddress;
+          }
+          EVMHandler.contracts[result.address] = contract;
           // init balance for newly deployed contracts
-          let account = EVMHandler.stateTrie.get(contractAddress, (err, accData) => {
+          let account = EVMHandler.stateTrie.get(result.address, (err, accData) => {
             let account = new Account(accData);
             account.balance = "0xffffffffffffffffffffffff";
-            EVMHandler.stateTrie.put(contractAddress, account.serialize(), () => {
+            EVMHandler.stateTrie.put(result.address, account.serialize(), () => {
               resolve(result);
             })
           });
-          // EVMHandler.vm.stateManager.getAccount(result.createdAddress, (err, account) => {
-          //   account.balance = "0xffffffffffffffffffffffff";
-          //   EVMHandler.vm.stateManager.putAccount(contractAddress, account, () => {
-          //     resolve(result);
-          //   })
-          // })
         }).catch((err) => {
           reject(err)
         })
@@ -219,6 +213,7 @@ EVMHandler = {
         txHash = utileth.bufferToHex(tx.hash());
         // resolve(result)
         EVMHandler.web3vm.eth.getTransaction(txHash, (err, evmTx) => {
+          evmTx.to = to;
           if (err) {
             reject(err);
           } else {

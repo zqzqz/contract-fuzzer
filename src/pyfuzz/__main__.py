@@ -122,6 +122,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
 
         contract_files = os.listdir(datadir)
         for filename in contract_files:
+            logger.info(filename)
             full_filename = os.path.join(datadir, filename)
             contract_name = filename.split('.')[0].split("#")[-1]
 

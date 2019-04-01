@@ -20,9 +20,9 @@ def test():
         print("visited:", fuzzer.contractMap[filename]["visited"])
 
 def test_exploit(datadir):
-    filename = os.path.join(datadir, '0x6f905E47d3e6A9Cc286b8250181Ee5A0441Acc81#PRESENT_1_ETH.sol')
+    filename = os.path.join(datadir, '0x57a53ffa64204f5f65c44f0179aecc152d68e81b#LetsCooperate.sol')
     fuzzer = Fuzzer()
-    fuzzer.loadContract(filename, "PRESENT_1_ETH")
+    fuzzer.loadContract(filename, "LetsCooperate")
     print("Reset...")
     state, seqLen = fuzzer.reset()
     for i in range(100):
@@ -35,3 +35,4 @@ def test_exploit(datadir):
 
 if __name__ == "__main__":
     test()
+    # test_exploit("/home/zqz/contracts")
