@@ -130,6 +130,8 @@ def deep_q_learning(sess,
         state, seq_len, filename = env.random_reset(datadir)
         loss = None
 
+        env.refreshEvm()
+
         # One step in the environment
         for t in itertools.count():
 

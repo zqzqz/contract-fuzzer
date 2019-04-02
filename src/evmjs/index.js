@@ -21,11 +21,10 @@ let protoDescriptor = grpc.loadPackageDefinition(packageDefinition);
 // The protoDescriptor object has the full package hierarchy
 let evm = protoDescriptor.evm;
 
-function resetWrapper(status) {
-  evmHandler.init().then((res) => {
-    call.write({ option: status.option });
-    call.end()
-  })
+async function resetWrapper(call) {
+  await evmHandler.init();
+  call.write({ option: call.request.option });
+  call.end()
 }
 
 async function getAccountsWrapper(call) {
@@ -86,7 +85,7 @@ async function sendTxWrapper(call) {
 function getServer() {
   var server = new grpc.Server();
   server.addService(evm.EVM.service, {
-    reset: (call, callback) => { callback(null, resetWrapper(call.request)); },
+    reset: resetWrapper,
     getAccounts: getAccountsWrapper,
     compile: (call, callback) => { callback(null, compileWrapper(call.request)); },
     deploy: deployWrapper,

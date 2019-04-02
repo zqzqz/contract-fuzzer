@@ -16,9 +16,9 @@ class EvmHandler():
         self.stub = pyfuzz.evm.evm_pb2_grpc.EVMStub(self.channel)
 
     def reset(self, option=0):
-        status = evm_pb2.Status(option=option)
+        status = pyfuzz.evm.evm_pb2.Status(option=option)
         ret = self.stub.Reset(status)
-        return ret.option
+        return
 
     def getAccounts(self, option=0):
         status = pyfuzz.evm.evm_pb2.Status(option=option)

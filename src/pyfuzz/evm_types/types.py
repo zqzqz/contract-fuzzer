@@ -32,7 +32,7 @@ for i in range(1, 33):
     type_list["bytes" + str(i)] = {"type": "bytes", "size": i * 8}
 
 type_list["bytes"] = {"type": "bytes", "size": 256}
-type_list["payment"] = {"type": "uint", "size": 64}
+type_list["payment"] = {"type": "uint", "size": 128}
 type_list["string"] = {"type": "string", "size": None}
 
 

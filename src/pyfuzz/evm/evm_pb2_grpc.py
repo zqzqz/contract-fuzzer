@@ -14,7 +14,7 @@ class EVMStub(object):
     Args:
       channel: A grpc.Channel.
     """
-    self.Reset = channel.unary_unary(
+    self.Reset = channel.unary_stream(
         '/evm.EVM/Reset',
         request_serializer=evm__pb2.Status.SerializeToString,
         response_deserializer=evm__pb2.Status.FromString,
@@ -83,7 +83,7 @@ class EVMServicer(object):
 
 def add_EVMServicer_to_server(servicer, server):
   rpc_method_handlers = {
-      'Reset': grpc.unary_unary_rpc_method_handler(
+      'Reset': grpc.unary_stream_rpc_method_handler(
           servicer.Reset,
           request_deserializer=evm__pb2.Status.FromString,
           response_serializer=evm__pb2.Status.SerializeToString,

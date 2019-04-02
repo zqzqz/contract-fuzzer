@@ -42,7 +42,7 @@ EVMHandler = {
   web3: new Web3(),
   // a nonce
   t: 12,
-  defaultBalance: "0xfffffffffffffffffffffffffffffff",
+  defaultBalance: "0xfffffffffffffffffffffffffffffffff",
   startTime: new Date().getTime() / 1000 | 0,
   txCnt: 0,
 
@@ -147,23 +147,24 @@ EVMHandler = {
   deploy: (contract) => {
     return new Promise((resolve, reject) => {
       EVMHandler.resetBalance(EVMHandler.defaultBalance).then(() => {
-        let accs = Object.keys(EVMHandler.accounts)
         EVMHandler.sendTx(EVMHandler.defaultAccount, EVMHandler.defaultContractAddress, "0", contract.bytecode).then((result) => {
           if (!result.createdAddress && (!EVMHandler.defaultContractAddress || EVMHandler.defaultContractAddress == ""))
             reject(Error("Invalid contract address"));
-          if (result.createdAddress) {
+          if (result.createdAddress && result.createdAddress !== undefined) {
             result.address = utileth.bufferToHex(result.createdAddress);
-            EVMHandler.defaultContractAddress = result.address;
           }
           else {
             result.address = EVMHandler.defaultContractAddress;
           }
-          EVMHandler.contracts[result.address] = contract;
+          // EVMHandler.contracts[result.address] = contract;
           // init balance for newly deployed contracts
-          let account = EVMHandler.stateTrie.get(result.address, (err, accData) => {
+          let address = Buffer.from(result.address.replace("0x", ""), "hex")
+          let account = EVMHandler.stateTrie.get(address, (err, accData) => {
             let account = new Account(accData);
-            account.balance = "0xffffffffffffffffffffffff";
-            EVMHandler.stateTrie.put(result.address, account.serialize(), () => {
+            // account.balance = "0xfffffffffffffffffffffffffffffff";
+            let rand_len = Math.floor(Math.random() * 24 + 8)
+            account.balance = "0x" + "f" * rand_len;
+            EVMHandler.stateTrie.put(address, account.serialize(), () => {
               resolve(result);
             })
           });

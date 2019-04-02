@@ -61,6 +61,9 @@ class Fuzzer():
         with open(os.path.join(DIR_CONFIG["seed_dir"], 'address.json'), 'w') as f:
             json.dump(list(self.accounts.keys()), f, indent="\t")
 
+    def refreshEvm(self):
+        self.evm.reset()
+
     def loadContract(self, filename, contract_name):
         self.state = None
         self.seqLen = None
@@ -283,6 +286,13 @@ class Fuzzer():
                 if bal > bal_p:
                     reward += FUZZ_CONFIG["exploit_reward"]
                     report.append(Exploit(nextState.txList, bal-bal_p))
+                # check the opcode SELFDESTRUCT
+                else:
+                    for trace in traces:
+                        if len(trace) > 0 and trace[-1]["op"] == "SELFDESTRUCT":
+                            reward += FUZZ_CONFIG["exploit_reward"]
+                            report.append(Exploit(nextState.txList, 0))
+                            break
             # testing
             if len(report) > 0:
                 done = 1

@@ -15,12 +15,11 @@ def test():
     print(accounts)
     print("\nTesting compile\n")
     contract = evm.compile(text, "Test")
-    print(contract)
     print("\nTesting deploy\n")
     address = evm.deploy(contract)
     print(address)
     print("\nTesting sendTx\n")
-    trace = evm.sendTx(list(accounts.keys())[0], address, "10000000000", contract["functionHashes"]["test1(uint256)"] + "0" * 32)
+    trace = evm.sendTx(list(accounts.keys())[0], address, "0", contract["functionHashes"]["test1(uint256)"] + "0" * 32)
     for t in trace:
         print(t["op"], end=" ")
     print("\nTesting getAccounts:\n")
@@ -28,7 +27,7 @@ def test():
     print(accounts)
 
 
-def test_exploit(datadir):
+def test_exploit_sample(datadir):
     filename = os.path.join(datadir, '0x6f905E47d3e6A9Cc286b8250181Ee5A0441Acc81#PRESENT_1_ETH.sol')
     evm = EvmHandler()
     with open(filename, 'r') as f:
@@ -49,7 +48,30 @@ def test_exploit(datadir):
     balance_1 = accounts[account]
     print("balance increment:", int(balance_1, 16) - int(balance, 16))
 
+def test_exploit(datadir):
+    filename = "0xde1fa94c7fa043fccf3938f47e9911ca584baed4#DailyGreed.sol"
+    name = filename.split('.')[0].split('#')[1]
+    filename = os.path.join(datadir, filename)
+    evm = EvmHandler()
+    with open(filename, 'r') as f:
+        text = f.read()
+    print("contract loaded")
+    contract = evm.compile(text, name)
+    print("compiled")
+    address = evm.deploy(contract)
+    print("deployed")
+    accounts = evm.getAccounts()
+    account = list(accounts.keys())[0]
+    balance = accounts[account]
+    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["init()"])
+    print("trace:", [t["op"] for t in trace])
+    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["kill()"])
+    print("trace:", [t["op"] for t in trace])
+    accounts = evm.getAccounts()
+    balance_1 = accounts[account]
+    print("balance increment:", int(balance_1, 16) - int(balance, 16))
+
 if __name__ == "__main__":
-    test()
+    # test()
     # "/home/zqz/contracts" is my directory
-    # test_exploit("/home/zqz/contracts")
+    test_exploit("/home/zqz/contracts")

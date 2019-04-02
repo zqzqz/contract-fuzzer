@@ -62,8 +62,13 @@ class ContractAbi:
         solcAbi = json.loads(contract["interface"])
         hashes = contract["functionHashes"]
         self.functionHashes = hashes
-        # print(hashes, solcAbi)
         for abi in solcAbi:
+            if abi["type"] == "fallback":
+                abi["inputs"] = []
+                self.interface[""] = abi
+                self.visited[""] = 0
+                self.funcHashList.append("")
+                continue
             if abi["type"] != "function":
                 continue
             if abi["stateMutability"]=="view":

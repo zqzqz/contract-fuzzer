@@ -7,7 +7,7 @@ package evm;
 // Interface exported by the server.
 service EVM {
 
-  rpc Reset(Status) returns (Status) {}
+  rpc Reset(Status) returns (stream Status) {}
   rpc GetAccounts(Status) returns (stream Json) {}
   rpc Compile(Source) returns (Json) {}
   rpc Deploy(Json) returns (stream Address) {}
