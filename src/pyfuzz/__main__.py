@@ -73,12 +73,12 @@ def fuzz(datadir, rand_prob, opts):
                             np.arange(len(action_probs)), p=action_probs)
                     else:
                         action = random.randint(0, TRAIN_CONFIG["action_num"]-1)
-                    state, seq_len, reward, done = env.step(action)
+                    state, seq_len, reward, done, timeout = env.step(action)
                 except Exception as e:
                     logger.error("__main__.fuzz: {}".format(str(e)))
-                    reward, done = 0, 0
+                    reward, done, timeout = 0, 0, 0
 
-                if done:
+                if done or timeout:
                     logger.info("contract {} finished".format(filename))
                     for rep in env.report:
                         logger.info(repr(rep))
@@ -155,13 +155,13 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                                 np.arange(len(action_probs)), p=action_probs)
                         else:
                             action = random.randint(0, TRAIN_CONFIG["action_num"]-1)
-                        state, seq_len, reward, done = env.step(action)
+                        state, seq_len, reward, done, timeout = env.step(action)
 
                     except Exception as e:
                         logger.error("__main__.baseline: {}".format(str(e)))
-                        reward, done = 0, 0
+                        reward, done, timeout = 0, 0, 0
 
-                    if done:
+                    if done or timeout:
                         logger.info("contract {} finished with counter {}".format(
                             filename, env.counter))
                         if env.counter == FUZZ_CONFIG["max_attempt"]:

@@ -73,8 +73,8 @@ class Fuzzer():
         self.filename = filename
         if filename in self.contractMap:
             # the contract is in cache
-            self.contractMap[filename]["abi"].resetVisited()
             self.contract = self.contractMap[filename]["contract"]
+            self.contractMap[filename]["abi"] = ContractAbi(self.contract)
             self.contractAbi = self.contractMap[filename]["abi"]
             self.contractAnalysisReport = self.contractMap[filename]["report"]
             return True
@@ -256,15 +256,16 @@ class Fuzzer():
         done = 0
         self.counter += 1
         reward = 0
+        timeout = 0
         try:
             # testing
             if self.counter >= FUZZ_CONFIG["max_attempt"]:
-                done = 1
+                timeout = 1
             action = self.actionProcessor.decodeAction(action)
             nextState = self.mutate(self.state, action)
             if not nextState:
                 state, seqLen = self.stateProcessor.encodeState(self.state)
-                return state, seqLen, reward, done
+                return state, seqLen, reward, done, timeout
             # execute transactions
             traces = self.runTxs(nextState.txList)
             # get reward of executions
@@ -302,11 +303,11 @@ class Fuzzer():
             # should exclude repeated reports
             self.report = list(set(self.report + report))
             state, seqLen = self.stateProcessor.encodeState(self.state)
-            return state, seqLen, reward, done
+            return state, seqLen, reward, done, timeout
         except Exception as e:
             logger.error("fuzzer.step: {}".format(str(e)))
             state, seqLen = self.stateProcessor.encodeState(self.state)
-            return state, seqLen, 0, 1
+            return state, seqLen, 0, 0, 1
 
     def coverage(self):
         jump_cnt = 0

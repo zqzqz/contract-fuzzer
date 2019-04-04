@@ -109,10 +109,11 @@ def deep_q_learning(sess,
         action_probs = policy(
             sess, state, epsilons[min(total_t, epsilon_decay_steps-1)], seq_len)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-        next_state, next_seq_len, reward, done = env.step(action)
+        next_state, next_seq_len, reward, done, timeout = env.step(action)
         replay_memory.append(Transition(
             state, seq_len, action, reward, next_state, next_seq_len, filename, done))
-        if done:
+        if done or timeout:
+            env.refreshEvm()
             state, seq_len, filename = env.random_reset(datadir)
         else:
             state = next_state
@@ -152,7 +153,7 @@ def deep_q_learning(sess,
             action_probs = policy(sess, state, epsilon, seq_len)
             action = np.random.choice(
                 np.arange(len(action_probs)), p=action_probs)
-            next_state, next_seq_len, reward, done = env.step(action)
+            next_state, next_seq_len, reward, done, timeout = env.step(action)
 
             # If our replay memory is full, pop the first element
             if len(replay_memory) == replay_memory_size:
@@ -172,9 +173,10 @@ def deep_q_learning(sess,
                 np.array, zip(*samples))
 
             # Calculate q values and targets
-            q_values_next = target_estimator.predict(sess, next_states_batch, next_seq_len_batch)
-            targets_batch = reward_batch.astype(np.float32) + np.invert(done_batch).astype(
-                np.float32) * discount_factor * np.amax(q_values_next, axis=1)
+            q_values_next = target_estimator.predict(
+                sess, next_states_batch, next_seq_len_batch)
+            targets_batch = reward_batch.astype(np.float32) + np.subtract(np.ones(len(
+                done_batch)), done_batch).astype(np.float32) * discount_factor * np.amax(q_values_next, axis=1)
 
             # Perform gradient descent update
             states_batch = np.array(states_batch)
@@ -182,7 +184,7 @@ def deep_q_learning(sess,
             loss = q_estimator.update(
                 sess, states_batch, action_batch, targets_batch, seq_len_batch)
 
-            if done:
+            if done or timeout:
                 break
 
             state = next_state
@@ -235,11 +237,11 @@ def train(datadir, episode_num=100, opts={}):
                         target_estimator=target_estimator,
                         experiment_dir=experiment_dir,
                         num_episodes=episode_num,
-                        replay_memory_size=10000,
-                        replay_memory_init_size=1000,
-                        update_target_estimator_every=1000,
+                        replay_memory_size=50000,
+                        replay_memory_init_size=5000,
+                        update_target_estimator_every=4000,
                         epsilon_start=1.0,
-                        epsilon_end=0.1,
-                        epsilon_decay_steps=10000,
-                        discount_factor=0.99,
+                        epsilon_end=0.4,
+                        epsilon_decay_steps=400000,
+                        discount_factor=0.95,
                         batch_size=32)
