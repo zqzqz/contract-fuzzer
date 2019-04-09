@@ -2,6 +2,9 @@ from pyfuzz.fuzzer.fuzzer import Fuzzer
 from pyfuzz.trainer.model import *
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
 from pyfuzz.trainer.train import train
+from pyfuzz.utils.utils import experimentDirectory
+from pyfuzz.fuzzer.exploit import Exploit
+from pyfuzz.fuzzer.detector.detector import Vulnerability
 import numpy as np
 import argparse
 import logging
@@ -18,7 +21,7 @@ def fuzz(datadir, rand_prob, opts):
     logger.info("fuzzing the contracts")
 
     # Where we save our checkpoints and graphs
-    experiment_dir = DIR_CONFIG["experiment_dir"]
+    experiment_dir = experimentDirectory(DIR_CONFIG["experiment_dir"], opts)
 
     # initialize fuzzer framework
     env = Fuzzer(evmEndPoint=None, opts=opts)
@@ -87,7 +90,7 @@ def fuzz(datadir, rand_prob, opts):
 
 def baseline(datadir, output, repeat_num, rand_prob, opts):
     # Where we save our checkpoints and graphs
-    experiment_dir = DIR_CONFIG["experiment_dir"]
+    experiment_dir = experimentDirectory(DIR_CONFIG["experiment_dir"], opts)
 
     # initialize fuzzer framework
     env = Fuzzer(evmEndPoint=None, opts=opts)
@@ -129,10 +132,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
             contract_name = filename.split('.')[0].split("#")[-1]
 
             if filename not in report:
-                report[filename] = {
-                    "success": [],
-                    "failure": []
-                }
+                report[filename] = {}
             else:
                 continue
 
@@ -140,7 +140,15 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                 continue
 
             for i in range(repeat_num):
+                report[filename][i] = {
+                    "reports": [],
+                    "coverage": 0,
+                    "attempt": 0
+                }
+                timeout = 0
+                done = 0
                 state, seq_len = env.reset()
+                report_num = 0
                 while True:
                     try:
                         if rand_prob < 1.0:
@@ -157,39 +165,20 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                             action = random.randint(0, TRAIN_CONFIG["action_num"]-1)
                         state, seq_len, reward, done, timeout = env.step(action)
 
+                        for r in range(report_num, len(env.report)):
+                            report[filename][i]["reports"].append({"report": repr(env.report[r]), "attempt": env.counter})
+                        report_num = len(env.report)
+
                     except Exception as e:
                         logger.error("__main__.baseline: {}".format(str(e)))
                         reward, done, timeout = 0, 0, 0
 
-                    if done or timeout:
+                    if timeout:
                         logger.info("contract {} finished with counter {}".format(
                             filename, env.counter))
-                        if env.counter == FUZZ_CONFIG["max_attempt"]:
-                            report[filename]["failure"].append(
-                                {"attempt": env.counter, "coverage": env.coverage()})
-                        else:
-                            report[filename]["success"].append(
-                                {"attempt": env.counter, "coverage": env.coverage()})
+                        report[filename][i]["coverage"] = env.coverage()
+                        report[filename][i]["attempt"] = env.counter
                         break
-
-            if len(report[filename]["success"]) + len(report[filename]["failure"]) != 0:
-                report[filename]["success_rate"] = len(report[filename]["success"]) / (
-                    len(report[filename]["success"]) + len(report[filename]["failure"]))
-            else:
-                report[filename]["success_rate"] = 0
-            if len(report[filename]["success"]) != 0:
-                report[filename]["attempt_rate"] = sum(
-                    [i["attempt"] for i in report[filename]["success"]]) / len(report[filename]["success"])
-                report[filename]["success_coverage"] = sum(
-                    [i["coverage"] for i in report[filename]["success"]]) / len(report[filename]["success"])
-            else:
-                report[filename]["attempt_rate"] = FUZZ_CONFIG["max_attempt"]
-                report[filename]["success_coverage"] = 0
-            if len(report[filename]["failure"]) != 0:
-                report[filename]["failure_coverage"] = sum(
-                    [i["coverage"] for i in report[filename]["failure"]]) / len(report[filename]["failure"])
-            else:
-                report[filename]["failure_coverage"] = 0
 
             with open(output, "w") as f:
                 json.dump(report, f, indent=4)

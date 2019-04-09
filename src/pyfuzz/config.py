@@ -4,26 +4,28 @@ TRAIN_CONFIG = {
     "max_call_num": 3,
     "max_func_num": 10,
     "max_func_arg": 4,
-    "token_size": 8,
+    "token_size": 32,
+    "feature_size": 8
 }
 
 TRAIN_CONFIG["action_num"] = TRAIN_CONFIG["max_call_num"] * 4
 
 ANALYSIS_CONFIG = {
-    "token_size": 8,
-    "max_line_num": 6,
-    "max_dep_num": 4,
+    "token_size": 5,
+    "max_line_num": 4,
+    "max_dep_num": 3,
+    "feature_num": 5
 }
 
-ANALYSIS_CONFIG["max_length"] = ANALYSIS_CONFIG["max_line_num"] * (ANALYSIS_CONFIG["max_dep_num"] + 2) + 1
+ANALYSIS_CONFIG["max_length"] = ANALYSIS_CONFIG["max_line_num"] * (ANALYSIS_CONFIG["max_dep_num"] + 2)
 
-TRAIN_CONFIG["max_line_length"] = ANALYSIS_CONFIG["token_size"] * (ANALYSIS_CONFIG["max_length"] + 2)
+TRAIN_CONFIG["max_line_length"] = TRAIN_CONFIG["token_size"] * (ANALYSIS_CONFIG["max_length"] + 2) + TRAIN_CONFIG["feature_size"] * ANALYSIS_CONFIG["feature_num"]
 
 FUZZ_CONFIG = {
     "seed_prob": 0.4,
     "random_action_prob": 0.4,
     "account_balance": "0xfffffffffffffffffffffffffffffffff",
-    "max_attempt": 200,
+    "max_attempt": 100,
     "valid_mutation_reward": 1,
     "vulnerability_reward": 1,
     "exploit_reward": 2,

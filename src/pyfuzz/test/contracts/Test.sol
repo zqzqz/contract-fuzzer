@@ -12,6 +12,5 @@ contract Test {
     function test2() public {
         require(owner == msg.sender);
         msg.sender.transfer(payments[msg.sender]);
-        msg.sender.call.value(payments[msg.sender])();
     }
 }

@@ -8,6 +8,7 @@ import tensorflow as tf
 from collections import deque, namedtuple
 
 from pyfuzz.fuzzer.fuzzer import Fuzzer
+from pyfuzz.utils.utils import experimentDirectory
 from pyfuzz.trainer.model import *
 from pyfuzz.config import *
 
@@ -112,7 +113,7 @@ def deep_q_learning(sess,
         next_state, next_seq_len, reward, done, timeout = env.step(action)
         replay_memory.append(Transition(
             state, seq_len, action, reward, next_state, next_seq_len, filename, done))
-        if done or timeout:
+        if timeout:
             env.refreshEvm()
             state, seq_len, filename = env.random_reset(datadir)
         else:
@@ -184,7 +185,7 @@ def deep_q_learning(sess,
             loss = q_estimator.update(
                 sess, states_batch, action_batch, targets_batch, seq_len_batch)
 
-            if done or timeout:
+            if timeout:
                 break
 
             state = next_state
@@ -216,7 +217,7 @@ def train(datadir, episode_num=100, opts={}):
     print("training the DQN")
 
     # Where we save our checkpoints and graphs
-    experiment_dir = DIR_CONFIG["experiment_dir"]
+    experiment_dir = experimentDirectory(DIR_CONFIG["experiment_dir"], opts)
 
     # Create a glboal step variable
     global_step = tf.Variable(0, name='global_step', trainable=False)

@@ -18,10 +18,9 @@ def test():
     analyzer = StaticAnalyzer(filename, "Test")
     report = analyzer.run(debug=0)
 
-    state = State(report, [Transaction(list(report.func_map.keys())[0], [12345], "121212121212121212121212", "123123123123", {"inputs": [{"type": "uint256"}]})])
+    state = State(report, [Transaction(list(report.func_map.keys())[0], [12345], "121212121212121212121212", "123123123123", {"inputs": [{"type": "uint256"}]}), None, None])
     state, seqLen = stateProcessor.encodeState(state)
     print("state", state.shape)
-    print(state)
     
 if __name__ == '__main__':
     test()

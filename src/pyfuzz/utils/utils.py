@@ -145,3 +145,20 @@ def intListToHexString(int_list, token_size):
     for i in int_list:
         hex_str += intToHex(i, token_size)
     return hex_str
+
+def intToOnehot(num, token_size):
+    assert(num >= 0)
+    res = [0 for i in range(token_size)]
+    if num >= token_size:
+        num = token_size
+    if num > 0:
+        res[token_size - num] = 1
+    return res
+
+def experimentDirectory(base_dir, opts):
+    assert(isinstance(opts, dict))
+    values = list(opts.values())
+    label = 0
+    for value in values:
+        label = label * 2 + int(value)
+    return base_dir + str(label)

@@ -40,7 +40,7 @@ class ActionProcessor:
 class State:
     def __init__(self, staticAnalysis, txList):
         self.staticAnalysis = staticAnalysis
-        self.txList = txList
+        self.txList = txList + [None for i in range(TRAIN_CONFIG["max_call_num"]-len(txList))]
 
 
 class StateProcessor:
@@ -71,24 +71,28 @@ class StateProcessor:
 
         for tx in txList:
             if not tx:
-                txLine = hexToBinary("0x0", self.sequence.shape[1])
+                txLine = np.array([0 for i in range(self.sequence.shape[1])], dtype=np.uint8)
                 self.sequence = np.append(
                     self.sequence, np.expand_dims(txLine, axis=0), axis=0)
                 continue
             if self.sequence.shape[0] > self.maxCallNum:
                 break
-            txLine = np.array([], dtype=np.uint8)
+            txLine = []
             if tx.hash not in staticAnalysis.encoded_report:
-                txStatic = "0"
+                txStatic = {
+                    "taint": [0 for i in range(ANALYSIS_CONFIG["max_length"])],
+                    "features": [0 for i in range(ANALYSIS_CONFIG["feature_num"])]
+                }
             else:
-                txStatic = intListToHexString(
-                    staticAnalysis.encoded_report[tx.hash], ANALYSIS_CONFIG["token_size"])
-            txStatic = hexToBinary(txStatic, size=ANALYSIS_CONFIG["max_length"] * ANALYSIS_CONFIG["token_size"])
-            txLine = np.append(txLine, txStatic)
-            visited = intListToHexString(
-                [tx.tmp_visited, tx.total_visited], TRAIN_CONFIG["token_size"])
-            visited = hexToBinary(visited, size=TRAIN_CONFIG["token_size"] * 2)
-            txLine = np.append(txLine, visited)
+                txStatic = staticAnalysis.encoded_report[tx.hash]
+            
+            for feature in txStatic["features"]:
+                txLine += intToOnehot(feature, TRAIN_CONFIG["feature_size"])
+            for token in txStatic["taint"]:
+                txLine += intToOnehot(token, TRAIN_CONFIG["token_size"])
+            for counter in [tx.tmp_visited, tx.total_visited]:
+                txLine += intToOnehot(counter, TRAIN_CONFIG["token_size"])
+            txLine = np.array(txLine, dtype=np.uint8)
 
             if txLine.shape[0] < self.sequence.shape[1]:
                 txLine = np.append(txLine, hexToBinary(
@@ -155,19 +159,20 @@ class Estimator():
             # Three convolutional layers
             conv1 = tf.contrib.layers.conv2d(
                 inputs=X, padding="SAME", num_outputs=32, kernel_size=[2, 32], activation_fn=tf.nn.relu)
-            pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[1, 2], strides=[1, 2])
+            pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[1, 4], strides=[1, 4])
             conv2 = tf.contrib.layers.conv2d(
-                inputs=pool1, padding="SAME", num_outputs=64, kernel_size=[2, 16], activation_fn=tf.nn.relu)
-            pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[1, 2], strides=[1, 2])
+                inputs=pool1, padding="SAME", num_outputs=32, kernel_size=[2, 16], activation_fn=tf.nn.relu)
+            pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[1, 4], strides=[1, 2])
             conv3 = tf.contrib.layers.conv2d(
-                inputs=pool2, padding="SAME", num_outputs=64, kernel_size=[2, 8], activation_fn=tf.nn.relu)
+                inputs=pool2, padding="SAME", num_outputs=32, kernel_size=[2, 8], activation_fn=tf.nn.relu)
             pool3 = tf.layers.max_pooling2d(inputs=conv3, pool_size=[1, 2], strides=[1, 2])
 
             # Fully connected layers
             flattened = tf.contrib.layers.flatten(pool3)
-            fc1 = tf.contrib.layers.fully_connected(flattened, 512)
+            print(flattened.shape)
+            # fc1 = tf.contrib.layers.fully_connected(flattened, 512)
             self.predictions = tf.contrib.layers.fully_connected(
-                fc1, action_num)
+                flattened, action_num)
             self.predictions = tf.identity(
                 self.predictions, name="predictions")
 

@@ -189,7 +189,7 @@ EVMHandler = {
       EVMHandler.txCnt += 1;
       let opts = {
         nonce: new BN(from.nonce++),
-        gasPrice: new BN(1),
+        gasPrice: new BN(0),
         gasLimit: new BN(3000000, 10),
         from: Buffer.from(from.replace("0x", ""), 'hex'),
         to: Buffer.from(to.replace("0x", ""), 'hex'),

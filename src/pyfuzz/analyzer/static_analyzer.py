@@ -77,6 +77,19 @@ class StaticAnalyzer(IrAnalyzer):
     @staticmethod
     def _parse_function_for_report(function):
         function.report = []
+        function.features = {
+            "call": len(function._external_calls_as_expressions),
+            "msg": 0,
+            "block": 0,
+            "args": len(function.parameters),
+            "payable": int(function.payable)
+        }
+        for v in function.variables_read:
+            if v and v.name:
+                if v.name.find("msg.") >= 0:
+                    function.features["msg"] += 1
+                elif v.name.find("block.") >= 0:
+                    function.features["block"] += 1
         '''
         the key("var") in report is just taintSink or all the variable(sink_taint)
         need to discuss
@@ -180,6 +193,7 @@ class StaticAnalyzer(IrAnalyzer):
         state_var_map = {}
         func_map = {}
         arg_map = {}
+        feature_map = {}
         # util function, encode zeros when mishitting
 
         def get_code(var, map):
@@ -187,51 +201,51 @@ class StaticAnalyzer(IrAnalyzer):
                 return 0
             else:
                 return map[var]
-        # encode state variables from 01...
-        count = self.max_token_value // 4
+        # encode state variables from 0...
+        count = 3
         for state_var in contract.state_variables:
             state_var_map[str(state_var)] = count
             state_var.encode_id = count
-            if (count + 1) < self.max_token_value:
+            if (count + 1) <= self.max_token_value:
                 count += 1
-        # encode functions from 10...
-        count = self.max_token_value * 2 // 4
+        # encode functions from 0...
+        count = 1
         for function in contract.functions:
             # init encoded report
             full_name = function.full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
-            encoded_report[func_hash] = []
+            encoded_report[func_hash] = {
+                "features": [],
+                "taint": []
+            }
+            feature_map[func_hash] = function.features
 
             arg_map[function.full_name] = {}
             func_map[function.full_name] = count
             # should record the encode_id in objects for the encoding of transactions later
             function.encode_id = count
-            if (count + 1) < self.max_token_value:
+            if (count + 1) <= self.max_token_value:
                 count += 1
 
             # encode arguments
-            arg_count = self.max_token_value * 3 // 4
+            arg_count = self.max_token_value - 1
             for arg in function.parameters:
                 arg_map[function.full_name][str(arg)] = arg_count
-                if (arg_count + 1) < self.max_token_value:
-                    arg_count += 1
+                if (arg_count - 1) >= 1:
+                    arg_count -= 1
 
         # encode each function arguments
         line_count = 0
-        call_flag_map = {}
         for report_line in contract.report:
             if line_count > self.max_line_num:
                 break
 
             full_name = report_line["func"].full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
-            # encoded_report[func_hash].append(get_code(full_name, func_map))
-            encoded_report[func_hash].append(
+            encoded_report[func_hash]["taint"].append(
                 get_code(str(report_line["var"]), state_var_map))
-            encoded_report[func_hash].append(
+            encoded_report[func_hash]["taint"].append(
                 get_code(str(report_line["op"]), self.op_map))
-            if report_line["op"] != "write":
-                call_flag_map[func_hash] = True
 
             count = 0
             for dep in report_line["deps"]:
@@ -254,21 +268,22 @@ class StaticAnalyzer(IrAnalyzer):
                     else:
                         code = get_code(str(dep), func)
                 if code:
-                    encoded_report[func_hash].append(code)
+                    encoded_report[func_hash]["taint"].append(code)
                     count += 1
             if count < self.max_dep_num:
-                encoded_report[func_hash] += [
+                encoded_report[func_hash]["taint"] += [
                     0 for i in range(self.max_dep_num - count)]
 
         for func_hash in encoded_report:
-            if func_hash in call_flag_map and call_flag_map[func_hash]:
-                encoded_report[func_hash] = [self.max_token_value - 1] + encoded_report[func_hash]
+            if func_hash in feature_map:
+                features = feature_map[func_hash]
+                encoded_report[func_hash]["features"] = [features["call"], features["msg"], features["block"], features["args"], features["payable"]]
             else:
-                encoded_report[func_hash] = [0] + encoded_report[func_hash]
-            if len(encoded_report[func_hash]) < self.max_length:
-                encoded_report[func_hash] += [0 for i in range(self.max_length - len(encoded_report[func_hash]))]
+                encoded_report[func_hash]["features"] = [0, 0, 0, 0, 0]
+            if len(encoded_report[func_hash]["taint"]) < self.max_length:
+                encoded_report[func_hash]["taint"] += [0 for i in range(self.max_length - len(encoded_report[func_hash]["taint"]))]
             elif len(encoded_report[func_hash]) > self.max_length:
-                encoded_report[func_hash] = encoded_report[func_hash][:self.max_length]
+                encoded_report[func_hash]["taint"] = encoded_report[func_hash]["taint"][:self.max_length]
 
         contract.encoded_report = encoded_report
         return encoded_report

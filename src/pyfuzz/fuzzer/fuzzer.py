@@ -79,26 +79,26 @@ class Fuzzer():
             self.contractAnalysisReport = self.contractMap[filename]["report"]
             return True
         else:
-            try:
-                with open(filename, "r") as f:
-                    source = f.read()
-                self.contract = self.evm.compile(source, contract_name)
-                self.contractAbi = ContractAbi(self.contract)
-                # run static analysis
-                self.staticAnalyzer.load_contract(filename, contract_name)
-                self.contractAnalysisReport = self.staticAnalyzer.run()
-                # set cache
-                self.contractMap[filename] = {
-                    "name": contract_name,
-                    "contract": self.contract,
-                    "abi": self.contractAbi,
-                    "report": self.contractAnalysisReport,
-                    "visited": set([])
-                }
-                return True
-            except Exception as e:
-                logger.error("fuzz.loadContract: {}".format(str(e)))
-                return False
+            # try:
+            with open(filename, "r") as f:
+                source = f.read()
+            self.contract = self.evm.compile(source, contract_name)
+            self.contractAbi = ContractAbi(self.contract)
+            # run static analysis
+            self.staticAnalyzer.load_contract(filename, contract_name)
+            self.contractAnalysisReport = self.staticAnalyzer.run()
+            # set cache
+            self.contractMap[filename] = {
+                "name": contract_name,
+                "contract": self.contract,
+                "abi": self.contractAbi,
+                "report": self.contractAnalysisReport,
+                "visited": set([])
+            }
+            return True
+            # except Exception as e:
+            #     logger.error("fuzz.loadContract: {}".format(str(e)))
+            #     return False
 
     def runOneTx(self, tx):
         if self.contract == None:
@@ -313,8 +313,8 @@ class Fuzzer():
         jump_cnt = 0
         try:
             code = self.contract["assembly"][".data"]["0"][".code"]
-            for pc in range(len(code)):
-                if code[pc]["name"][:4] in branch_op:
+            for op in code:
+                if op["name"][:4] in branch_op:
                     jump_cnt += 1
         except:
             pass

@@ -17,7 +17,11 @@ def test():
             for exp in node._vars_written:
                 print(str(exp), end=' ')
             print()
-    visitor = Visitor(node_visitor=node_visitor)
+
+    def function_visitor(function):
+        print(function.full_name, [v.name for v in function.variables_read])
+    
+    visitor = Visitor(function_visitor=function_visitor, node_visitor=node_visitor)
     # visitor = Visitor()
     ir_analyzer.parse_contracts(visitor)
 

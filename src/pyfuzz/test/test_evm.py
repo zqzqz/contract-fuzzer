@@ -72,6 +72,6 @@ def test_exploit(datadir):
     print("balance increment:", int(balance_1, 16) - int(balance, 16))
 
 if __name__ == "__main__":
-    # test()
+    test()
     # "/home/zqz/contracts" is my directory
-    test_exploit("/home/zqz/contracts")
+    # test_exploit("/home/zqz/contracts")
