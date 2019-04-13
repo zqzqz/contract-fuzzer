@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='evm',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\tevm.proto\x12\x03\x65vm\"\x18\n\x06Status\x12\x0e\n\x06option\x18\x01 \x01(\r\"$\n\x06Source\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"\x14\n\x04Json\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\t\"\x1a\n\x07\x41\x64\x64ress\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\"K\n\nSendTxData\x12\x10\n\x08\x66romAddr\x18\x01 \x01(\t\x12\x0e\n\x06toAddr\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x04 \x01(\t2\xcb\x01\n\x03\x45VM\x12#\n\x05Reset\x12\x0b.evm.Status\x1a\x0b.evm.Status\"\x00\x12)\n\x0bGetAccounts\x12\x0b.evm.Status\x1a\t.evm.Json\"\x00\x30\x01\x12#\n\x07\x43ompile\x12\x0b.evm.Source\x1a\t.evm.Json\"\x00\x12%\n\x06\x44\x65ploy\x12\t.evm.Json\x1a\x0c.evm.Address\"\x00\x30\x01\x12(\n\x06SendTx\x12\x0f.evm.SendTxData\x1a\t.evm.Json\"\x00\x30\x01\x62\x06proto3')
+  serialized_pb=_b('\n\tevm.proto\x12\x03\x65vm\"\x18\n\x06Status\x12\x0e\n\x06option\x18\x01 \x01(\r\"$\n\x06Source\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"\x14\n\x04Json\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\t\"\x1a\n\x07\x41\x64\x64ress\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\t\"Y\n\nSendTxData\x12\x10\n\x08\x66romAddr\x18\x01 \x01(\t\x12\x0e\n\x06toAddr\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x04 \x01(\t\x12\x0c\n\x04opts\x18\x05 \x01(\r2\xcd\x01\n\x03\x45VM\x12%\n\x05Reset\x12\x0b.evm.Status\x1a\x0b.evm.Status\"\x00\x30\x01\x12)\n\x0bGetAccounts\x12\x0b.evm.Status\x1a\t.evm.Json\"\x00\x30\x01\x12#\n\x07\x43ompile\x12\x0b.evm.Source\x1a\t.evm.Json\"\x00\x12%\n\x06\x44\x65ploy\x12\t.evm.Json\x1a\x0c.evm.Address\"\x00\x30\x01\x12(\n\x06SendTx\x12\x0f.evm.SendTxData\x1a\t.evm.Json\"\x00\x30\x01\x62\x06proto3')
 )
 
 
@@ -191,6 +191,13 @@ _SENDTXDATA = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='opts', full_name='evm.SendTxData.opts', index=4,
+      number=5, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -204,7 +211,7 @@ _SENDTXDATA = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=132,
-  serialized_end=207,
+  serialized_end=221,
 )
 
 DESCRIPTOR.message_types_by_name['Status'] = _STATUS
@@ -257,8 +264,8 @@ _EVM = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=210,
-  serialized_end=413,
+  serialized_start=224,
+  serialized_end=429,
   methods=[
   _descriptor.MethodDescriptor(
     name='Reset',

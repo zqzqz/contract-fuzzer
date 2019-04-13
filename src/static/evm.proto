@@ -45,4 +45,6 @@ message SendTxData {
   string value = 3;
   // hex string of payload
   string data = 4;
+  // other
+  uint32 opts = 5;
 }

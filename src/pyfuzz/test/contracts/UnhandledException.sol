@@ -4,7 +4,6 @@ contract Test {
     uint a;
 
     function UnhandledException() public {
-        msg.sender.send(0xffffffffffffffffffffffffffffffff);
-        a += 1;
+        msg.sender.send(0xff);
     }
 }

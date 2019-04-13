@@ -6,6 +6,7 @@ from pyfuzz.fuzzer.detector.detector import Detector, Vulnerability
 import json
 
 evm = EvmHandler()
+detector = Detector({"vulnerability": True})
 
 def test_vulnerability(name):
     print("Testing", name)
@@ -20,7 +21,6 @@ def test_vulnerability(name):
     print()
     with open(os.path.join(os.path.dirname(__file__), '../test/contracts/'+name+'Trace.json'), 'w') as f:
         json.dump(trace, f, indent=4)
-    detector = Detector()
     vulns = detector.run([trace])
     for vuln in vulns:
         print(str(vuln))

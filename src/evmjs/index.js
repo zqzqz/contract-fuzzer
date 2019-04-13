@@ -70,7 +70,9 @@ async function deployWrapper(call) {
 
 async function sendTxWrapper(call) {
   try {
-    let res = await evmHandler.sendTx(call.request.fromAddr, call.request.toAddr, call.request.value, call.request.data);
+    if (call.request.opts == 0) revertCallFlag = false
+    else revertCallFlag = true
+    let res = await evmHandler.sendTx(call.request.fromAddr, call.request.toAddr, call.request.value, call.request.data, revertCallFlag);
     let trace = await evmHandler.debug(res.tx);
     call.write({
       data: JSON.stringify(trace)

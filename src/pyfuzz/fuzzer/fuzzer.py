@@ -3,7 +3,7 @@ from pyfuzz.fuzzer.interface import ContractAbi, Transaction
 from pyfuzz.trainer.model import Action, ActionProcessor, State, StateProcessor
 from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
 from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
-from pyfuzz.fuzzer.exploit import Exploit
+from pyfuzz.fuzzer.detector.exploit import Exploit
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
 
 import logging
@@ -53,7 +53,7 @@ class Fuzzer():
         self.accounts = self.evm.getAccounts()
         self.defaultAccount = list(self.accounts.keys())[0]
         # analyzers
-        self.traceAnalyzer = TraceAnalyzer()
+        self.traceAnalyzer = TraceAnalyzer(opts)
         self.staticAnalyzer = StaticAnalyzer()
         # for test
         self.counter = 0
@@ -100,44 +100,53 @@ class Fuzzer():
             #     logger.error("fuzz.loadContract: {}".format(str(e)))
             #     return False
 
-    def runOneTx(self, tx):
+    def runOneTx(self, tx, opts={}):
         if self.contract == None:
             logger.error("Contract have not been loaded.")
             return None
         trace = self.evm.sendTx(tx.sender, self.contractAddress,
-                                str(tx.value), tx.payload)
+                                str(tx.value), tx.payload, opts)
         return trace
 
     def runTxs(self, txList):
         self.contractAddress = self.evm.deploy(self.contract)
         traces = []
+        opts = {}
+        calls = []
+
         for tx in txList:
             if not tx:
+                calls.append(0)
+                traces.append([])
                 continue
+            if tx.hash in self.contractAnalysisReport.encoded_report:
+                calls.append(self.contractAnalysisReport.encoded_report[tx.hash]["features"][0])
+            else:
+                calls.append(0)
             tx.updateVisited()
             self.contractMap[self.filename]["abi"].updateVisited(tx.hash)
-            trace = self.runOneTx(tx)
+            trace = self.runOneTx(tx, opts)
             if not trace:
                 trace = []
             traces.append(trace)
+        
+        # if there is any call
+        if sum(calls) > 0:
+            # revert all calls when executing transactions
+            opts["revert"] = True
+            for txi in range(len(txList)):
+                if not txList[txi]:
+                    continue
+                trace = self.runOneTx(txList[txi], opts)
+                if trace:
+                    traces[txi] += trace
         return traces
-
-    def reward(self, traces):
-        reward, report, jump_pcs = self.traceAnalyzer.run(
-            self.traces, traces, self.opts["vulnerability"])
-        self.traces = traces
-
-        return reward, report, jump_pcs
 
     def loadSeed(self, txList, pcs):
         """
         add arguments of a tx list to seeds
         """
-        valid_tx_cnt = 0
-        for tx in txList:
-            if tx:
-                valid_tx_cnt += 1
-        assert(valid_tx_cnt == len(pcs))
+        assert(len(txList) == len(pcs))
 
         seeds = self.contractAbi.typeHandler.seeds
         visitedPcList = self.contractMap[self.filename]["visited"]
@@ -145,11 +154,9 @@ class Fuzzer():
         for i in range(len(txList)):
             if not txList[i]:
                 continue
-            if pcs[j].issubset(visitedPcList):
-                j += 1
+            if pcs[i].issubset(visitedPcList):
                 continue
-            self.contractMap[self.filename]["visited"] = visitedPcList.union(
-                pcs[j])
+            self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[i])
             for arg in txList[i].typedArgs:
                 if arg[0] not in seeds:
                     seeds[arg[0]] = [arg[1]]
@@ -269,7 +276,8 @@ class Fuzzer():
             # execute transactions
             traces = self.runTxs(nextState.txList)
             # get reward of executions
-            reward, report, pcs = self.reward(traces)
+            reward, report, pcs = self.traceAnalyzer.run(self.traces, traces)
+            self.traces = traces
             # bonus for valid mutation
             reward += FUZZ_CONFIG["valid_mutation_reward"]
             # update seeds
@@ -286,14 +294,11 @@ class Fuzzer():
 
                 if bal > bal_p:
                     reward += FUZZ_CONFIG["exploit_reward"]
-                    report.append(Exploit(nextState.txList, bal-bal_p))
-                # check the opcode SELFDESTRUCT
-                else:
-                    for trace in traces:
-                        if len(trace) > 0 and trace[-1]["op"] == "SELFDESTRUCT":
-                            reward += FUZZ_CONFIG["exploit_reward"]
-                            report.append(Exploit(nextState.txList, 0))
-                            break
+                    report.append(Exploit("BalanceIncrement", nextState.txList))
+            # fill in transasactions for exploitation
+            for rep in report:
+                if isinstance(rep, Exploit):
+                    rep.txList = nextState.txList
             # testing
             if len(report) > 0:
                 done = 1
@@ -312,10 +317,7 @@ class Fuzzer():
     def coverage(self):
         jump_cnt = 0
         try:
-            code = self.contract["assembly"][".data"]["0"][".code"]
-            for op in code:
-                if op["name"][:4] in branch_op:
-                    jump_cnt += 1
+            jump_cnt = self.contract["opcodes"].count("JUMP")
         except:
             pass
 

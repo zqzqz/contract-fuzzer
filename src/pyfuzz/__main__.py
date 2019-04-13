@@ -3,8 +3,8 @@ from pyfuzz.trainer.model import *
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
 from pyfuzz.trainer.train import train
 from pyfuzz.utils.utils import experimentDirectory
-from pyfuzz.fuzzer.exploit import Exploit
-from pyfuzz.fuzzer.detector.detector import Vulnerability
+from pyfuzz.fuzzer.detector.exploit import Exploit
+from pyfuzz.fuzzer.detector.vulnerability import Vulnerability
 import numpy as np
 import argparse
 import logging

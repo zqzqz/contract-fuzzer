@@ -1,11 +1,14 @@
 from pyfuzz.fuzzer.detector.detector import Detector
+from pyfuzz.fuzzer.detector.vulnerability import Vulnerability
+from pyfuzz.fuzzer.detector.exploit import Exploit
 from pyfuzz.config import FUZZ_CONFIG
 
 branch_op = ["JUMP", "JUMPI", "JUMPDEST", "STOP", "REVERT"]
+call_op = ["CALL", "CALLCODE", "DELEGATECALL", "SELFDESTRUCT"]
 
 class TraceAnalyzer:
-    def __init__(self):
-        self.detector = Detector()
+    def __init__(self, opts={}):
+        self.detector = Detector(opts)
 
     """
         input:
@@ -15,13 +18,16 @@ class TraceAnalyzer:
           report (list(string)): found vulnerabilities
           reward (int): calculated reward
     """
-    def run(self, ptraces, ctraces, detect_flag=True):
+    def run(self, ptraces, ctraces):
         report = []
         reward, jumps = self.path_variaty(ptraces, ctraces)
         reward *= FUZZ_CONFIG["path_variaty_reward"]
-        if detect_flag:
-            report = self.detector.run(ctraces)
-            reward += len(report) * FUZZ_CONFIG["vulnerability_reward"]
+        report = self.detector.run(ctraces)
+        for rep in report:
+            if isinstance(rep, Vulnerability):
+                reward += FUZZ_CONFIG["vulnerability_reward"]
+            elif isinstance(rep, Exploit):
+                reward += FUZZ_CONFIG["exploit_reward"]
         return reward, report, jumps
 
     def path_variaty(self, ptraces, ctraces):

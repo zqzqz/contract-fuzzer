@@ -1,58 +1,40 @@
 from pyfuzz.fuzzer.detector.oracle import *
-
-
-class Vulnerability():
-    def __init__(self, vul_type, pc, description=""):
-        self.vul_type = vul_type
-        self.pc = pc
-        self.description = description
-
-    def __eq__(self, other):
-        if self.__class__ != other.__class__:
-            return False
-        return self.vul_type == other.vul_type and self.pc == other.pc
-
-    def __hash__(self):
-        import hashlib
-        m = hashlib.md5()
-        payload = self.vul_type + str(self.pc)
-        m.update(payload.encode("utf-8"))
-        return int(m.hexdigest(), 16)
-
-    def __repr__(self):
-        return "{}: pc {}".format(self.vul_type, str(self.pc))
-
-    def __dict__(self):
-        return {
-            "type": self.vul_type,
-            "pc": self.pc,
-            "description": self.description
-        }
-
+from pyfuzz.fuzzer.detector.vulnerability import Vulnerability
+from pyfuzz.fuzzer.detector.exploit import Exploit
 
 class Detector():
     def __init__(self, opts={}):
         """
-        opts: indicating enabled detectors. e.g. { "TimestampDependency": False }, default to true
+        opts: indicating enabled mode. e.g. { "vulnerability": False }, default to true
         """
-        self.detectors = {
-            "TimestampDependency": self.timestamp_dependency_detector,
-            "BlockNumberDependency": self.block_number_dependency_detector,
-            "UnhandledException": self.unhandled_exception_detector,
-            "Reentrancy": self.reentrancy_detector
-        }
-        self.oracles = {
-            "TimestampOp": TimestampOpOracle(),
-            "BlockNumOp": BlockNumOpOracle(),
-            "EtherTransfer": EtherTransferOracle(),
-            "SendCall": SendCallOracle(),
-            "Exception": ExceptionOracle(),
-            "Revert": RevertOracle(),
-            "Reentrancy": ReentrancyOracle()
-        }
+        self.opts = opts
+        if "exploit" not in opts:
+            self.opts["exploit"] = False
+        if "vulnerability" not in opts:
+            self.opts["vulnerability"] = False
+        self.detectors = {}
+        self.oracles = {}
+        if self.opts["exploit"]:
+            self.detectors["CodeInjection"] = self.code_injection_detector
+            self.detectors["Selfdestruct"] = self.selfdestruct_detector
+            self.oracles["CodeInjection"] = CodeInjectionOracle()
+            self.oracles["Selfdestruct"] = SelfdestructOracle()
+
+        if self.opts["vulnerability"]:
+            self.detectors["TimestampDependency"] = self.timestamp_dependency_detector
+            self.detectors["BlockNumberDependency"] = self.block_number_dependency_detector
+            self.detectors["UnhandledException"] = self.unhandled_exception_detector
+            self.detectors["Reentrancy"] = self.reentrancy_detector
+            self.oracles["TimestampOp"] = TimestampOpOracle()
+            self.oracles["BlockNumOp"] = BlockNumOpOracle()
+            self.oracles["EtherTransfer"] = EtherTransferOracle()
+            self.oracles["SendCall"] = SendCallOracle()
+            self.oracles["Exception"] = ExceptionOracle()
+            self.oracles["Revert"] = RevertOracle()
+            self.oracles["Reentrancy"] = ReentrancyOracle()
+
         for det in opts:
-            if det in self.detectors and opts[det] == False:
-                self.detectors.pop(det, None)
+            self.detectors.pop(det, None)
 
     def reset_oracles(self):
         for oracle_num in self.oracles:
@@ -124,4 +106,18 @@ class Detector():
         if reentrancy_flag:
             for pc in self.oracles["Reentrancy"].pcs:
                 vulnerabilities.append(Vulnerability("Reentrancy", pc))
+        return vulnerabilities
+
+    def code_injection_detector(self):
+        vulnerabilities = []
+        code_injection_flag = self.oracles["CodeInjection"].triggered
+        if code_injection_flag:
+            vulnerabilities.append(Exploit("CodeInjection", [None, None, None]))
+        return vulnerabilities
+
+    def selfdestruct_detector(self):
+        vulnerabilities = []
+        selfdestruct_flag = self.oracles["Selfdestruct"].triggered
+        if selfdestruct_flag:
+            vulnerabilities.append(Exploit("Selfdestruct", [None, None, None]))
         return vulnerabilities

@@ -3,7 +3,6 @@ import grpc
 
 from pyfuzz.evm import evm_pb2 as evm__pb2
 
-
 class EVMStub(object):
   """Interface exported by the server.
   """

@@ -4,8 +4,8 @@ contract Test {
     address owner;
     mapping(address => uint) payments;
 
-    function test1(uint a) public {
-        owner = msg.sender;
+    function test1(uint a) public payable {
+        require(a <= 1 ether);
         payments[msg.sender] += a;
     }
 

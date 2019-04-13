@@ -49,8 +49,11 @@ class EvmHandler():
             break
         return ret
 
-    def sendTx(self, fromAddr, toAddr, value, data):
-        sendTxData = pyfuzz.evm.evm_pb2.SendTxData(fromAddr=fromAddr, toAddr=toAddr, value=value, data=data)
+    def sendTx(self, fromAddr, toAddr, value, data, opts={}):
+        sentOpts = 0
+        if "revert" in opts and opts["revert"]:
+            sentOpts += 1
+        sendTxData = pyfuzz.evm.evm_pb2.SendTxData(fromAddr=fromAddr, toAddr=toAddr, value=value, data=data, opts=sentOpts)
         ret = None
         for i in self.stub.SendTx(sendTxData):
             ret = i.data

@@ -183,7 +183,7 @@ EVMHandler = {
   },
 
   // send a raw transaction
-  sendTx: (from, to, value, data) => {
+  sendTx: (from, to, value, data, revertCallFlag=false) => {
     if (value == "") value = "0";
     return new Promise((resolve, reject) => {
       EVMHandler.txCnt += 1;
@@ -207,7 +207,7 @@ EVMHandler = {
         transactions: [],
         uncleHeaders: []
       })
-      EVMHandler.vm.runTx({block: block, tx: tx, skipBalance: false, skipNonce: true}, (error, result) => {
+      EVMHandler.vm.runTx({block: block, tx: tx, skipBalance: false, skipNonce: true, revertCallFlag: revertCallFlag}, (error, result) => {
         if (error || result == null || result === undefined) {
           reject(error);
         }

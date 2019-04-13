@@ -240,9 +240,9 @@ def train(datadir, episode_num=100, opts={}):
                         num_episodes=episode_num,
                         replay_memory_size=50000,
                         replay_memory_init_size=5000,
-                        update_target_estimator_every=4000,
+                        update_target_estimator_every=5000,
                         epsilon_start=1.0,
                         epsilon_end=0.4,
-                        epsilon_decay_steps=400000,
+                        epsilon_decay_steps=500000,
                         discount_factor=0.95,
                         batch_size=32)

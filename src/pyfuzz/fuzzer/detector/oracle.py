@@ -93,11 +93,11 @@ class SendCallOracle(Oracle):
                 return
             gas = stack[-1]
             # todo: vm does not show 2300 gas when calling send
-            gas = hex(2300)
+            # gas = hex(2300)
 
             address = stack[-2]
             input_len = stack[-5]
-            if int(input_len, 16) == 0 and address[-40:] in self.accounts and int(gas, 16) == 2300:
+            if int(input_len, 16) == 0 and address[-40:] in self.accounts and int(gas, 16) == 0:
                 self.results.append(OracleReport(self.name, 1, step["pc"]))
 
 
@@ -109,9 +109,10 @@ class ExceptionOracle(Oracle):
     def run_step(self, step):
         if step["op"] == "CALL":
             self.call_pc = step["pc"]
-        if step["pc"] == self.call_pc + 1:
+        elif self.call_pc >= 0:
             if int(step["stack"][-1], 16) == 0:
                 self.results.append(OracleReport(self.name, 1, self.call_pc))
+            self.call_pc = -2
 
 
 class RevertOracle(Oracle):
@@ -142,9 +143,34 @@ class ReentrancyOracle(Oracle):
             # is it necessary to have value > 0?
             value = stack[-3]
 
-            if int(gas, 16) != 2300 and address[-40:] in self.accounts:
+            if int(gas, 16) != 0 and address[-40:] in self.accounts:
                 self.call_pc = step["pc"]
         
         if self.call_pc > 0 and step["op"] == "SSTORE":
             self.results.append(OracleReport(self.name, 1, self.call_pc))
             self.call_pc = -1
+
+class CodeInjectionOracle(Oracle):
+    def __init__(self):
+        super().__init__("CodeInjection")
+        self.accounts = []
+        seed_dir = DIR_CONFIG["seed_dir"]
+        json_file = os.path.join(seed_dir, "address.json")
+        if os.path.isfile(json_file):
+            with open(json_file, "r") as f:
+                self.accounts = list(json.load(f))
+        
+    def run_step(self, step):
+        if step["op"] == "CALLCODE" or step["op"] == "DELEGATECALL":
+            stack = step["stack"]
+            address = stack[-2]
+            if address[-40:] in self.accounts:
+                self.results.append(OracleReport(self.name, 1, step["pc"]))
+
+class SelfdestructOracle(Oracle):
+    def __init__(self):
+        super().__init__("Selfdestruct")
+
+    def run_step(self, step):
+        if step["op"] == "SELFDESTRUCT":
+            self.results.append(OracleReport(self.name, 1, step["pc"]))              
