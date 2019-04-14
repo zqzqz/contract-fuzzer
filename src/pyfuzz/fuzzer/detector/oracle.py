@@ -104,15 +104,15 @@ class SendCallOracle(Oracle):
 class ExceptionOracle(Oracle):
     def __init__(self):
         super().__init__("Exception")
-        self.call_pc = -2
+        self.call_pc = -1
 
     def run_step(self, step):
         if step["op"] == "CALL":
             self.call_pc = step["pc"]
         elif self.call_pc >= 0:
-            if int(step["stack"][-1], 16) == 0:
+            if len(step["stack"]) > 0 and int(step["stack"][-1], 16) == 0:
                 self.results.append(OracleReport(self.name, 1, self.call_pc))
-            self.call_pc = -2
+            self.call_pc = -1
 
 
 class RevertOracle(Oracle):

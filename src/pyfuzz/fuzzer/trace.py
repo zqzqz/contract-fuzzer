@@ -19,16 +19,29 @@ class TraceAnalyzer:
           reward (int): calculated reward
     """
     def run(self, ptraces, ctraces):
-        report = []
         reward, jumps = self.path_variaty(ptraces, ctraces)
         reward *= FUZZ_CONFIG["path_variaty_reward"]
+        seeds = self.get_seed_candidates(ctraces)
         report = self.detector.run(ctraces)
         for rep in report:
             if isinstance(rep, Vulnerability):
                 reward += FUZZ_CONFIG["vulnerability_reward"]
             elif isinstance(rep, Exploit):
                 reward += FUZZ_CONFIG["exploit_reward"]
-        return reward, report, jumps
+        return reward, report, jumps, seeds
+
+    def get_seed_candidates(self, ctraces):
+        seeds = []
+        sha_pc = -1
+        for trace in ctraces:
+            for state in trace:
+                if state["op"] == "SHA3":
+                    sha_pc = state["pc"]
+                elif sha_pc >= 0:
+                    if len(state["stack"]) > 0:
+                        seeds.append(("bytes", bytearray.fromhex(state["stack"][-1])))
+                    sha_pc = -1
+        return seeds
 
     def path_variaty(self, ptraces, ctraces):
         pJumps = []

@@ -142,7 +142,7 @@ class Fuzzer():
                     traces[txi] += trace
         return traces
 
-    def loadSeed(self, txList, pcs):
+    def loadSeed(self, txList, pcs, more_seeds=[]):
         """
         add arguments of a tx list to seeds
         """
@@ -162,6 +162,10 @@ class Fuzzer():
                     seeds[arg[0]] = [arg[1]]
                 else:
                     seeds[arg[0]].append(arg[1])
+
+        for seed in more_seeds:
+            if seed[0] in seeds:
+                seeds[seed[0]].append(seed[1])
 
     def mutate(self, state, action):
         txList = state.txList + []
@@ -276,12 +280,12 @@ class Fuzzer():
             # execute transactions
             traces = self.runTxs(nextState.txList)
             # get reward of executions
-            reward, report, pcs = self.traceAnalyzer.run(self.traces, traces)
+            reward, report, pcs, seeds = self.traceAnalyzer.run(self.traces, traces)
             self.traces = traces
             # bonus for valid mutation
             reward += FUZZ_CONFIG["valid_mutation_reward"]
             # update seeds
-            self.loadSeed(nextState.txList, pcs)
+            self.loadSeed(nextState.txList, pcs, seeds)
             # check whether exploitation happens
             if self.opts["exploit"]:
                 self.accounts = self.evm.getAccounts()
