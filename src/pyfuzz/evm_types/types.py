@@ -32,7 +32,7 @@ for i in range(1, 33):
     type_list["bytes" + str(i)] = {"type": "bytes", "size": i * 8}
 
 type_list["bytes"] = {"type": "bytes", "size": 256}
-type_list["payment"] = {"type": "uint", "size": 128}
+type_list["payment"] = {"type": "uint", "size": 80}
 type_list["string"] = {"type": "string", "size": None}
 
 
@@ -61,8 +61,8 @@ class TypeHandler():
             else:
                 if type_list[_type]["type"] == "uint" or type_list[_type]["type"] == "int":
                     self.seeds[_type] = [
-                        self.generateValueByType(_type, "min"),
-                        self.generateValueByType(_type, "max")
+                        0,
+                        1
                     ]
                 else:
                     self.seeds[_type] = []

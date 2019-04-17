@@ -112,7 +112,8 @@ class ContractAbi:
     """
     def generateTx(self, hash, sender):
         args = self.generateTxArgs(hash)
-        value = self.generateTxValue(hash)
+        # value = self.generateTxValue(hash)
+        value = 1000
         return Transaction(hash, args, value, sender, self.interface[hash], self.visited[hash])
 
     def updateVisited(self, funcHash):

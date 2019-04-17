@@ -75,7 +75,7 @@ def test_exploit(datadir):
     balance = accounts[account]
     trace = evm.sendTx(account, address, "0", contract["functionHashes"]["own(address)"] + eth_abi.encode_abi(["address"], [account]).hex())
     print("trace:", [t["op"] for t in trace])
-    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["releaseFunds(uint256)"] + eth_abi.encode_abi(["uint256"], [1]).hex())
+    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["releaseFunds(uint256)"] + eth_abi.encode_abi(["uint256"], [100]).hex())
     print("trace:", [t["op"] for t in trace])
     accounts = evm.getAccounts()
     balance_1 = accounts[account]

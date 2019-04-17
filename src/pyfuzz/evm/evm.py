@@ -26,7 +26,7 @@ class EvmHandler():
         for i in self.stub.GetAccounts(status):
             ret = i.data
             break
-        if not ret or len(ret) > 0:
+        if ret and len(ret) > 0:
             return json.loads(ret)
         else:
             logger.error("Correct response not received from rpc server (getAccounts)")
@@ -35,7 +35,7 @@ class EvmHandler():
     def compile(self, text, name):
         source = pyfuzz.evm.evm_pb2.Source(text=text, name=name)
         ret = self.stub.Compile(source)
-        if not ret or len(ret.data) > 0:
+        if ret and len(ret.data) > 0:
             return json.loads(ret.data)
         else:
             logger.error("Correct response not received from rpc server (compile)")
@@ -58,7 +58,7 @@ class EvmHandler():
         for i in self.stub.SendTx(sendTxData):
             ret = i.data
             break
-        if not ret or len(ret) > 0:
+        if ret and len(ret) > 0:
             return json.loads(ret)
         else:
             logger.error("Correct response not received from rpc server (sendTx)")

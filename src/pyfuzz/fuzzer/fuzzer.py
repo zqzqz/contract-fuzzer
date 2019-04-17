@@ -106,6 +106,8 @@ class Fuzzer():
             return None
         trace = self.evm.sendTx(tx.sender, self.contractAddress,
                                 str(tx.value), tx.payload, opts)
+        if not trace:
+            trace = []
         return trace
 
     def runTxs(self, txList):
