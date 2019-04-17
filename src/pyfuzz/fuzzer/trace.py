@@ -33,14 +33,21 @@ class TraceAnalyzer:
     def get_seed_candidates(self, ctraces):
         seeds = []
         sha_pc = -1
+        pre_state = None
+        trace_id = 0
         for trace in ctraces:
+            seeds.append([])
             for state in trace:
-                if state["op"] == "SHA3":
+                if state["op"] == "SHA3" and pre_state and pre_state["op"][:4] == "SWAP":
                     sha_pc = state["pc"]
                 elif sha_pc >= 0:
-                    if len(state["stack"]) > 0:
-                        seeds.append(("bytes", bytearray.fromhex(state["stack"][-1])))
+                    try:
+                        seeds[trace_id].append(("bytes", bytearray.fromhex(state["stack"][-1].lstrip("0x"))))
+                    except:
+                        pass
                     sha_pc = -1
+                pre_state = state
+            trace_id += 1
         return seeds
 
     def path_variaty(self, ptraces, ctraces):

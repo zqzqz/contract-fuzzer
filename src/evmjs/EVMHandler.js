@@ -9,7 +9,7 @@ const BN = require('ethereumjs-util').BN
 const remixLib = require('remix-lib')
 const Debugger = require('remix-debug').EthDebugger
 const async = require('async')
-const Trie = require('merkle-patricia-tree')
+const Trie = require('merkle-patricia-tree/secure.js')
 const Account = require('ethereumjs-account')
 
 privateKeys = [
@@ -42,7 +42,7 @@ EVMHandler = {
   web3: new Web3(),
   // a nonce
   t: 12,
-  defaultBalance: "0xfffffffffffffffffffffffffffffffff",
+  defaultBalance: "ffffffffffffffffffffffffffffffff",
   startTime: new Date().getTime() / 1000 | 0,
   txCnt: 0,
 
@@ -99,7 +99,7 @@ EVMHandler = {
         }
         let address = Buffer.from(addressHex, "hex")
         let account = new Account();
-        account.balance = balance
+        account.balance = Buffer.from(balance, "hex")
         EVMHandler.stateTrie.put(address, account.serialize(), () => {
           next();
         })
@@ -159,11 +159,11 @@ EVMHandler = {
           // EVMHandler.contracts[result.address] = contract;
           // init balance for newly deployed contracts
           let address = Buffer.from(result.address.replace("0x", ""), "hex")
+          // let address = result.address.replace("0x", "")
           let account = EVMHandler.stateTrie.get(address, (err, accData) => {
             let account = new Account(accData);
-            // account.balance = "0xfffffffffffffffffffffffffffffff";
-            let rand_len = Math.floor(Math.random() * 24 + 8)
-            account.balance = "0x" + "f" * rand_len;
+            // let rand_len = Math.floor(Math.random() * 24 + 8)
+            account.balance = Buffer.from(EVMHandler.defaultBalance, "hex");
             EVMHandler.stateTrie.put(address, account.serialize(), () => {
               resolve(result);
             })

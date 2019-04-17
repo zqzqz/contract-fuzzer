@@ -7,6 +7,7 @@ contract Test {
     function test1(uint a) public payable {
         require(a <= 1 ether);
         payments[msg.sender] += a;
+        msg.sender.transfer(this.balance);
     }
 
     function test2() public {

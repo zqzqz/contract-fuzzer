@@ -78,7 +78,7 @@ def fuzz(datadir, rand_prob, opts):
                         action = random.randint(0, TRAIN_CONFIG["action_num"]-1)
                     state, seq_len, reward, done, timeout = env.step(action)
                 except Exception as e:
-                    logger.error("__main__.fuzz: {}".format(str(e)))
+                    logger.exception("__main__.fuzz: {}".format(str(e)))
                     reward, done, timeout = 0, 0, 0
 
                 if done or timeout:
@@ -170,7 +170,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                         report_num = len(env.report)
 
                     except Exception as e:
-                        logger.error("__main__.baseline: {}".format(str(e)))
+                        logger.exception("__main__.baseline: {}".format(str(e)))
                         reward, done, timeout = 0, 0, 0
 
                     if timeout:
@@ -206,7 +206,7 @@ def main():
 
     args = parser.parse_args()
     if not os.path.isdir(args.datadir):
-        logger.error("wrong datadir")
+        logger.exception("wrong datadir")
         exit(1)
     if args.random:
         rand_prob = 1.0
@@ -223,7 +223,7 @@ def main():
     elif args.cmd == "baseline":
         baseline(args.datadir, args.output, args.repeat, rand_prob, opts)
     else:
-        logger.error("command {} is not found".format(args.cmd))
+        logger.exception("command {} is not found".format(args.cmd))
 
 
 if __name__ == '__main__':

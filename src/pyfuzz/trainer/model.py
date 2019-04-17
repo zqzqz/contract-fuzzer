@@ -169,7 +169,6 @@ class Estimator():
 
             # Fully connected layers
             flattened = tf.contrib.layers.flatten(pool3)
-            print(flattened.shape)
             # fc1 = tf.contrib.layers.fully_connected(flattened, 512)
             self.predictions = tf.contrib.layers.fully_connected(
                 flattened, action_num)

@@ -79,30 +79,30 @@ class Fuzzer():
             self.contractAnalysisReport = self.contractMap[filename]["report"]
             return True
         else:
-            # try:
-            with open(filename, "r") as f:
-                source = f.read()
-            self.contract = self.evm.compile(source, contract_name)
-            self.contractAbi = ContractAbi(self.contract)
-            # run static analysis
-            self.staticAnalyzer.load_contract(filename, contract_name)
-            self.contractAnalysisReport = self.staticAnalyzer.run()
-            # set cache
-            self.contractMap[filename] = {
-                "name": contract_name,
-                "contract": self.contract,
-                "abi": self.contractAbi,
-                "report": self.contractAnalysisReport,
-                "visited": set([])
-            }
-            return True
-            # except Exception as e:
-            #     logger.error("fuzz.loadContract: {}".format(str(e)))
-            #     return False
+            try:
+                with open(filename, "r") as f:
+                    source = f.read()
+                self.contract = self.evm.compile(source, contract_name)
+                self.contractAbi = ContractAbi(self.contract)
+                # run static analysis
+                self.staticAnalyzer.load_contract(filename, contract_name)
+                self.contractAnalysisReport = self.staticAnalyzer.run()
+                # set cache
+                self.contractMap[filename] = {
+                    "name": contract_name,
+                    "contract": self.contract,
+                    "abi": self.contractAbi,
+                    "report": self.contractAnalysisReport,
+                    "visited": set([])
+                }
+                return True
+            except Exception as e:
+                logger.exception("fuzz.loadContract: {}".format(str(e)))
+                return False
 
     def runOneTx(self, tx, opts={}):
         if self.contract == None:
-            logger.error("Contract have not been loaded.")
+            logger.exception("Contract have not been loaded.")
             return None
         trace = self.evm.sendTx(tx.sender, self.contractAddress,
                                 str(tx.value), tx.payload, opts)
@@ -147,7 +147,7 @@ class Fuzzer():
         add arguments of a tx list to seeds
         """
         assert(len(txList) == len(pcs))
-
+        new_path_flag = False
         seeds = self.contractAbi.typeHandler.seeds
         visitedPcList = self.contractMap[self.filename]["visited"]
         j = 0
@@ -156,16 +156,19 @@ class Fuzzer():
                 continue
             if pcs[i].issubset(visitedPcList):
                 continue
+            new_path_flag = True
             self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[i])
+            
             for arg in txList[i].typedArgs:
                 if arg[0] not in seeds:
                     seeds[arg[0]] = [arg[1]]
                 else:
                     seeds[arg[0]].append(arg[1])
 
-        for seed in more_seeds:
-            if seed[0] in seeds:
-                seeds[seed[0]].append(seed[1])
+            for seed in more_seeds[i]:
+                if seed[0] in seeds:
+                    seeds[seed[0]].append(seed[1])
+        return new_path_flag
 
     def mutate(self, state, action):
         txList = state.txList + []
@@ -227,7 +230,7 @@ class Fuzzer():
         """
         self.counter = 0
         if not self.contract:
-            logger.error("Contract not inintialized in fuzzer.")
+            logger.exception("Contract not inintialized in fuzzer.")
             return None, None
         self.contractAddress = self.evm.deploy(self.contract)
 
@@ -246,8 +249,11 @@ class Fuzzer():
         filename = choice(contract_files)
         state, seq_len = self.contract_reset(datadir, filename)
         while seq_len == None:
-            filename = choice(contract_files)
-            state, seq_len = self.contract_reset(datadir, filename)
+            try:
+                filename = choice(contract_files)
+                state, seq_len = self.contract_reset(datadir, filename)
+            except:
+                state, seq_len = None, None
         return state, seq_len, filename
 
     def contract_reset(self, datadir, filename):
@@ -285,7 +291,8 @@ class Fuzzer():
             # bonus for valid mutation
             reward += FUZZ_CONFIG["valid_mutation_reward"]
             # update seeds
-            self.loadSeed(nextState.txList, pcs, seeds)
+            if self.loadSeed(nextState.txList, pcs, seeds):
+                reward += FUZZ_CONFIG["path_discovery_reward"]
             # check whether exploitation happens
             if self.opts["exploit"]:
                 self.accounts = self.evm.getAccounts()
@@ -314,7 +321,7 @@ class Fuzzer():
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, reward, done, timeout
         except Exception as e:
-            logger.error("fuzzer.step: {}".format(str(e)))
+            logger.exception("fuzzer.step: {}".format(str(e)))
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, 0, 0, 1
 

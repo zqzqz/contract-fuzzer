@@ -1,6 +1,16 @@
 import os
 import json
 
+def list_all_contracts(datapath):
+    source = []
+    for filename in os.listdir(datapath):
+        try:
+            with open(os.path.join(datapath, filename), "r", encoding="utf-8") as f:
+                source.append(f.read())
+        except Exception as e:
+            print("error", e, filename)
+
+
 def select_success(filepath):
     with open(filepath, "r") as f:
         report = json.load(f)
@@ -33,4 +43,4 @@ def compare_reports(filepath0, filepath1):
             pass
     print("total", a / total, b / total)
 
-compare_reports("report0.json", "report1.json")
+list_all_contracts("/home/zqz/teether_contract")
