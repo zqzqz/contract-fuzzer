@@ -134,6 +134,7 @@ class ReentrancyOracle(Oracle):
             with open(json_file, "r") as f:
                 self.accounts = list(json.load(f))
         self.call_pc = -1
+        self.write_op_list = ["SSTORE", "JUMP", "JUMPI"]
     
     def run_step(self, step):
         if self.call_pc <= 0 and step["op"] == "CALL":
@@ -146,7 +147,7 @@ class ReentrancyOracle(Oracle):
             if int(gas, 16) != 0 and address[-40:] in self.accounts:
                 self.call_pc = step["pc"]
         
-        if self.call_pc > 0 and step["op"] == "SSTORE":
+        if self.call_pc > 0 and step["op"] in self.write_op_list:
             self.results.append(OracleReport(self.name, 1, self.call_pc))
             self.call_pc = -1
 

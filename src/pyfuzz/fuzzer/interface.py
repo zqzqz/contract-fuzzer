@@ -101,7 +101,7 @@ class ContractAbi:
     def generateTxValue(self, hash):
         assert(self.interface[hash] != None)
         inputAbi = self.interface[hash]["inputs"]
-        value = ""
+        value = 0
         if self.interface[hash]['payable']:
             value = self.typeHandler.fuzzByType("payment", FUZZ_CONFIG["seed_prob"])
         return value
@@ -113,7 +113,10 @@ class ContractAbi:
     def generateTx(self, hash, sender):
         args = self.generateTxArgs(hash)
         # value = self.generateTxValue(hash)
-        value = 1000
+        if self.interface[hash]['payable']:
+            value = 1000
+        else:
+            value = 0
         return Transaction(hash, args, value, sender, self.interface[hash], self.visited[hash])
 
     def updateVisited(self, funcHash):

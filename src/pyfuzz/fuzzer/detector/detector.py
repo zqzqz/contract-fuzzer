@@ -5,12 +5,12 @@ from pyfuzz.fuzzer.detector.exploit import Exploit
 class Detector():
     def __init__(self, opts={}):
         """
-        opts: indicating enabled mode. e.g. { "vulnerability": False }, default to true
+        opts: indicating enabled mode. e.g. { "vulnerability": False }
         """
         self.opts = opts
-        if "exploit" not in opts:
+        if "exploit" not in self.opts:
             self.opts["exploit"] = False
-        if "vulnerability" not in opts:
+        if "vulnerability" not in self.opts:
             self.opts["vulnerability"] = False
         self.detectors = {}
         self.oracles = {}
@@ -33,17 +33,14 @@ class Detector():
             self.oracles["Revert"] = RevertOracle()
             self.oracles["Reentrancy"] = ReentrancyOracle()
 
-        for det in opts:
-            self.detectors.pop(det, None)
-
     def reset_oracles(self):
         for oracle_num in self.oracles:
             self.oracles[oracle_num].reset()
 
     def run_oracles(self, trace):
         for step in trace:
-            for oracle_num in self.oracles:
-                self.oracles[oracle_num].run_step(step)
+            for oracle_name in self.oracles:
+                self.oracles[oracle_name].run_step(step)
 
     def run_one_trace(self, trace):
         vulnerabilities = []

@@ -136,19 +136,18 @@ class Fuzzer():
         if sum(calls) > 0:
             # revert all calls when executing transactions
             opts["revert"] = True
-            for txi in range(len(txList)):
-                if not txList[txi]:
+            for tx in txList:
+                if not tx:
                     continue
-                trace = self.runOneTx(txList[txi], opts)
+                trace = self.runOneTx(tx, opts)
                 if trace:
-                    traces[txi] += trace
+                    traces.append(trace)
         return traces
 
     def loadSeed(self, txList, pcs, more_seeds=[]):
         """
         add arguments of a tx list to seeds
         """
-        assert(len(txList) == len(pcs))
         new_path_flag = False
         seeds = self.contractAbi.typeHandler.seeds
         visitedPcList = self.contractMap[self.filename]["visited"]

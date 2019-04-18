@@ -150,6 +150,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                 state, seq_len = env.reset()
                 report_num = 0
                 while True:
+                    # print(env.state.txList)
                     try:
                         if rand_prob < 1.0:
                             feed_dict = {X: np.expand_dims(

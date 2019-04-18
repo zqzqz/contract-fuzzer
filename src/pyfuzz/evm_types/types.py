@@ -177,9 +177,9 @@ class TypeHandler():
         elif type_obj["type"] == "bool":
             bool_prob = random.random()
             if bool_prob < 0.5:
-                return 0
+                return False
             else:
-                return 1
+                return True
 
         elif type_obj["type"] == "byte":
             num_size = 8
