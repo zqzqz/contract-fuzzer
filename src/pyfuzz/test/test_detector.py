@@ -19,8 +19,8 @@ def test_vulnerability(name):
     for t in trace:
         print(t["op"], end=" ")
     print()
-    with open(os.path.join(os.path.dirname(__file__), '../test/contracts/'+name+'Trace.json'), 'w') as f:
-        json.dump(trace, f, indent=4)
+    # with open(os.path.join(os.path.dirname(__file__), '../test/contracts/'+name+'Trace.json'), 'w') as f:
+    #     json.dump(trace, f, indent=4)
     vulns = detector.run([trace])
     for vuln in vulns:
         print(str(vuln))

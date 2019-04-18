@@ -63,10 +63,10 @@ class Detector():
             return vulnerabilities
         pcs = self.oracles["TimestampOp"].pcs
 
-        send_call_pcs = self.oracles["SendCall"].pcs
+        # send_call_pcs = self.oracles["SendCall"].pcs
         ether_transfer_pcs = self.oracles["EtherTransfer"].pcs
-        critical_call_pcs = list(set(send_call_pcs).intersection(ether_transfer_pcs))
-        if len(critical_call_pcs) > 0:
+        # critical_call_pcs = list(set(send_call_pcs).intersection(ether_transfer_pcs))
+        if len(ether_transfer_pcs) > 0:
             for pc in pcs:
                 vulnerabilities.append(Vulnerability("TimestampDependency", pc))
         return vulnerabilities
@@ -78,10 +78,10 @@ class Detector():
             return vulnerabilities
         pcs = self.oracles["BlockNumOp"].pcs
 
-        send_call_pcs = self.oracles["SendCall"].pcs
+        # send_call_pcs = self.oracles["SendCall"].pcs
         ether_transfer_pcs = self.oracles["EtherTransfer"].pcs
-        critical_call_pcs = list(set(send_call_pcs).intersection(ether_transfer_pcs))
-        if len(critical_call_pcs) > 0:
+        # critical_call_pcs = list(set(send_call_pcs).intersection(ether_transfer_pcs))
+        if len(ether_transfer_pcs) > 0:
             for pc in pcs:
                 vulnerabilities.append(Vulnerability("BlockNumberDependency", pc))
         return vulnerabilities
