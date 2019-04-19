@@ -404,9 +404,9 @@ class StaticAnalyzer(IrAnalyzer):
             else:
                 for mark in node._taintList:
                     for var in node._taintList[mark]:
-                        function.taintList[mark].append(var)
-                        # if var in function.taintSink:
-                        #     function.taintList[mark].append(var)
+                        # function.taintList[mark].append(var)
+                        if var in function.taintSink:
+                            function.taintList[mark].append(var)
             return
 
         def process(function,node):
