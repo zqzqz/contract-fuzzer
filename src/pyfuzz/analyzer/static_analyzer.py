@@ -299,21 +299,16 @@ class StaticAnalyzer(IrAnalyzer):
         '''
         def setSource(self):
             para_vars = [p_var for p_var in self._parameters if p_var != None]
+            self.taintSource.extend(para_vars)
             self.taintSource.extend(self._solidity_vars_read)
             self.taintSource.extend(self._state_vars_read)
-            self.taintSource.extend(para_vars)
             for var in self.taintSource:
                 self.taintList[var] = []
+                for node in self.nodes:
+                    node._taintList[var] = []
 
         def setSink(self):
             self.taintSink.extend(self._state_vars_written)
-
-        def setFlag(self):
-            for node in self.nodes:
-                if (hex(node._node_type) == '0x50'):
-                    node.flag = 0
-                if (hex(node._node_type) in ['0x12', '0x15']):
-                    node.flag = 2
 
         def set_br_taint(self):
             for node in self.nodes:
@@ -321,7 +316,7 @@ class StaticAnalyzer(IrAnalyzer):
                     self.branch_taint[node._node_id] = []
                     r_vars = [r_var for r_var in node._vars_read if r_var != None]
                     for var in r_vars:
-                        if var in self.taintList:
+                        if var in function.taintList:
                             self.branch_taint[node._node_id].append(var)
 
 
@@ -340,94 +335,176 @@ class StaticAnalyzer(IrAnalyzer):
                 function.current_br_taint = []
                 function.setSource = MethodType(setSource, function)
                 function.setSink = MethodType(setSink, function)
-                function.setFlag = MethodType(setFlag, function)
                 function.set_br_taint = MethodType(set_br_taint, function)
 
+                for node in function.nodes:
+                    node._taintList = {} # key:mark; value:[v1,v2...]
+                    node._tainted = {} # key: the vars which has been tainted (except marks); value:mark
+                    node._IsParsed = False
+                    node._toParse = True
+
+                # Initialize source, sink, taintList and branch_taint of function
+                function.setSource()
+                function.setSink()
+                function.set_br_taint()
+
     def taint_analysis(self):
-        # two important function used in taint analysis
-        def propagation(function, stack):
-            top = stack[len(stack) - 1]
-            # extra policy for branch node
+        def DFSparse(function,node):
+
+            # Update toParse state of current node
+            if (node.fathers): # nodes besides STARTPOINT
+                node._toParse = True
+                for father in node.fathers:
+                    if not(father._IsParsed):
+                        node._toParse = False
+                        break
+
+            # stop forward when current node's toParse is false except for IF_LOOP
+            if (not(node._toParse) and not(hex(node._node_type) == '0x15')):
+                return
+
+            # deal with the case that IF without else
+            if node._IsParsed:
+                return
+            if (node.fathers):
+                process(function,node)
+
+            # Update IsParsed state of current node
+            node._IsParsed = True
+            if (node.sons):
+                # deal with for-loop whose sons order is different
+                if (hex(node._node_type) == '0x15'):
+                    if (hex(node.sons[0]._node_type) == '0x52'):
+                        DFSparse(function,node.sons[1])
+                        DFSparse(function,node.sons[0])
+                        return
+                # normal sons order
+                for son in node.sons:
+                    # transfer loop circle into two lines and inherit the loop taints
+                    if ((hex(son._node_type) == '0x15') and not (hex(node._node_type) == '0x51')):
+                        son._toParse = True
+                        son._taintList = node._taintList.copy()
+                        son._tainted = node._tainted.copy()
+                        return
+                    DFSparse(function, son)
+            # filter the taintlist of exitNode and add to function's taintList
+            else:
+                for mark in node._taintList:
+                    for var in node._taintList[mark]:
+                        if var in function.taintSink:
+                            function.taintList[mark].append(var)
+            return
+
+        def process(function,node):
+            # extra policy for branch nodes or expression nodes
+            # TODO : how to deal with if(address.call.value())
             # IF node
-            if (hex(top._node_type) == '0x12'):  # IF
-                top.flag -= 1
-                function.current_br_taint.append(function.branch_taint[top._node_id])
-                return top._sons[1 - top.flag]
+            if (hex(node._node_type) == '0x12'):  # IF
+                # inherit from a single parent
+                copy_taint(node.fathers[0],node)
+                # add corresponding br_mark of IF
+                function.current_br_taint.append(function.branch_taint[node.node_id])
+
+
             # END_IF node
-            elif (hex(top._node_type) == '0x50'):
-                while (hex(stack[len(stack) - 1]._node_type) != '0x12'):
-                    pop_action(function, stack)
-                nodetypes = [hex(node._node_type) for node in stack]
-                IF_node = stack[len(stack) - 1]
-                pop_action(function, stack)
+            elif (hex(node._node_type) == '0x50'):
+                # inherit from a single parent of parents
+                copy_taint(node.fathers[0],node)
+                # Combine two father into a single son
+                for var in node.fathers[1]._tainted:
+                    if not(var in node._tainted):
+                        node._tainted[var] = (node.fathers[1]._tainted[var])
+                        for mark in node.fathers[1]._tainted[var]:
+                            node._taintList[mark].append(var)
+                    else:
+                        for mark in node.fathers[1]._tainted[var]:
+                            if not(mark in node._tainted[var]):
+                                node._tainted[var].append(mark)
+                                node._taintList[mark].append(var)
+                # drop the finished branch taint
                 function.current_br_taint.pop()
-                nodetypes = [hex(node._node_type) for node in stack]
-                if (IF_node.flag > 0):
-                    return IF_node
-                # return top._sons[0]
+                return
+
             # IF_LOOP node
-            elif (hex(top._node_type) == '0x15'):
-                top.flag -= 1
-                function.current_br_taint.append(function.branch_taint[top._node_id])
-                return top._sons[top.flag]
+            elif (hex(node._node_type) == '0x15'):
+                # inherit from a single parent of two parents
+                copy_taint(node.fathers[0], node)
+                if not(node._toParse):
+                    node._taintList = node.fathers[0]._taintList.copy()
+                    node._tainted = node.fathers[0]._tainted.copy()
+                    # add corresponding br_mark of IF_LOOP
+                    for br_mark in function.branch_taint[node._node_id]:
+                        if not (br_mark in node._taintList):
+                            node._taintList[br_mark] = [br_mark]
+                        else:
+                            pass
+                    function.current_br_taint.append(function.branch_taint[node.node_id])
+                else:pass
+                return
+
             # END_LOOP node
-            elif (hex(top._node_type) == '0x52'):
-                while (hex(stack[len(stack) - 1]._node_type) != '0x51'):
-                    pop_action(function, stack)
-                pop_action(function, stack)
+            elif (hex(node._node_type) == '0x15'):
+                # inherit from a single parent of two parents
+                copy_taint(node.fathers[0], node)
+                # drop the finished branch taint
                 function.current_br_taint.pop()
-                # return top._sons[0]
-            # straight line flow node
-            return top._sons[0]
-        
-        def pop_action(function, stack):
-            # 最大的问题，使用pop遍历，是反向遍历有向图，无法复现data flow，完全是假的taint analysis
-            # e.g.  tmp = a; b = a; 不能得到 a taints b
-            node = stack.pop()
-            # variables read at current node
+
+
+            # straight line flow node which has a single parent and a single child
+            # inherit from a single parent ( or parent of parents )
+            copy_taint(node.fathers[0], node)
+            # update taintList and tainted for expression node
+            propagation(node)
+
+            return
+
+        def copy_taint(from_node,to_node):
+            for mark in from_node._taintList:
+                to_node._taintList[mark] = from_node._taintList[mark][:]
+            for var in from_node._tainted:
+                if not(var in to_node._tainted):
+                    to_node._tainted[var]=from_node._tainted[var][:]
+
+        def propagation(node):
             r_vars = [r_var for r_var in node._vars_read if r_var != None]
             for var in r_vars:
-                # Make taint mark of taintList
-                if var in function.taintList:
+                if (var in node._taintList):  # var is taint mark
                     for w_var in node._vars_written:
-                        # 没有检查w_var是不是sink
-                        if w_var in function.taintSink and w_var not in function.taintList[var]:
-                            function.taintList[var].append(w_var)
-                # Make taint mark of branch node_vars
-                total_br_taint = []
-                for br_taintList in function.current_br_taint:
-                    total_br_taint.extend(br_taintList)
-                # 没搞懂，total_br_taint 是 taintList.keys()子集，和391行完全重复
-                # 不应该判断var in total_br_taint，而是直接添加total_br_taint
-                # if var in total_br_taint:
-                #     for w_var in node._vars_written:
-                #         if not (w_var in function.taintList[var]):
-                #             function.taintList[var].append(w_var)
-        
+                        if not (w_var in node._taintList[var]):
+                            node._taintList[var].append(w_var)
+                            if w_var in node._tainted:
+                                node._tainted[w_var].append(var)
+                            else:
+                                node._tainted[w_var] = [var]
+                if (var in node._tainted):
+                    for w_var in node._vars_written:
+                        for mark in node._tainted[var]:  # mark is taint mark
+                            if not (w_var in node._taintList[mark]):
+                                node._taintList[mark].append(w_var)
+                                if w_var in node._tainted:
+                                    node._tainted[w_var].append(mark)
+                                else:
+                                    node._tainted[w_var] = [mark]
+
+        def br_taint_effect(function,node):
+            total_br_taint = []
+            tmp = []
+            for br in function.current_br_taint:
+                tmp.extend(br)
+            for taint in tmp:
+                if not(taint in total_br_taint):
+                    total_br_taint.append(taint)
+            #TODO
+
+
         # main part of taint_analysis
-        stack = []
         for contract in self.contracts:
+            print('\ncurrent contract is:  ', contract.name, "\n")
             for function in contract.functions:
-                # Initialize Source, Sink, taintList of fun;
-                function.setSink()
-                function.setSource()
-                function.setFlag()
-                function.set_br_taint()
                 if function.nodes == []: break
                 # Find the entrance of cfg
-                currentNode = function.nodes[0]
-                stack.append(currentNode)
-                while (currentNode._sons):
-                    currentNode = propagation(function, stack)
-                    stack.append(currentNode)
-                    # The following three lines can be used to print
-                    # nodetypes = [hex(node._node_type) for node in stack]
-                    # print('current node is: ',currentNode._expression,'\n','id is: ',currentNode._node_id,' type is : ',hex(currentNode._node_type))
-                    # print('stack info: ', nodetypes)
-                while (stack):
-                    pop_action(function, stack)
-                    # To print pop process after traversal of function
-
+                startNode = function.nodes[0]
+                DFSparse(function,startNode)
                     
     def run(self, debug=0):
         """
