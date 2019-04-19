@@ -28,9 +28,9 @@ FUZZ_CONFIG = {
     "max_attempt": 500,
     "valid_mutation_reward": 1,
     "vulnerability_reward": 1,
-    "exploit_reward": 3,
-    "path_variaty_reward": 1,
-    "path_discovery_reward": 0.5
+    "exploit_reward": 2,
+    "path_variaty_reward": 0.5,
+    "path_discovery_reward": 0.2
 }
 
 DIR_CONFIG = {}

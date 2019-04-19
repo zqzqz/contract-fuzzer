@@ -42,7 +42,12 @@ class EvmHandler():
             return None
 
     def deploy(self, contract):
-        contractRpc = pyfuzz.evm.evm_pb2.Json(data=json.dumps(contract))
+        new_contract = {}
+        if "bytecode" in contract:
+            new_contract["bytecode"] = contract["bytecode"]
+        else:
+            return None
+        contractRpc = pyfuzz.evm.evm_pb2.Json(data=json.dumps(new_contract))
         ret = None
         for i in self.stub.Deploy(contractRpc):
             ret = i.address

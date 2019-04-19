@@ -244,5 +244,5 @@ def train(datadir, episode_num=100, opts={}):
                         epsilon_start=1.0,
                         epsilon_end=0.4,
                         epsilon_decay_steps=500000,
-                        discount_factor=0.95,
+                        discount_factor=0.5,
                         batch_size=32)
