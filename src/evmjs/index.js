@@ -44,8 +44,13 @@ function compileWrapper(sourceObj) {
   let name = sourceObj.name;
   try {
     let contract = evmHandler.compile(text, name);
+    let sim_contract = {}
+    if (contract.interface) sim_contract.interface = contract.interface
+    if (contract.functionHashes) sim_contract.functionHashes = contract.functionHashes
+    if (contract.bytecode) sim_contract.bytecode = contract.bytecode
+    if (contract.opcodes) sim_contract.opcodes = contract.opcodes
     return {
-      data: JSON.stringify(contract)
+      data: JSON.stringify(sim_contract)
     };
   } catch (err) {
     console.log(err)

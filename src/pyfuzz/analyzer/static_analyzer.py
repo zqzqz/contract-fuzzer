@@ -299,11 +299,11 @@ class StaticAnalyzer(IrAnalyzer):
         '''
         def setSource(self):
             para_vars = [p_var for p_var in self._parameters if p_var != None]
-            self.taintSource.extend(para_vars)
             self.taintSource.extend(self._solidity_vars_read)
             self.taintSource.extend(self._state_vars_read)
+            self.taintSource.extend(para_vars)
             for var in self.taintSource:
-                self.taintList[var] = [var]
+                self.taintList[var] = []
 
         def setSink(self):
             self.taintSink.extend(self._state_vars_written)
@@ -321,7 +321,7 @@ class StaticAnalyzer(IrAnalyzer):
                     self.branch_taint[node._node_id] = []
                     r_vars = [r_var for r_var in node._vars_read if r_var != None]
                     for var in r_vars:
-                        if var in function.taintList:
+                        if var in self.taintList:
                             self.branch_taint[node._node_id].append(var)
 
 
@@ -381,6 +381,8 @@ class StaticAnalyzer(IrAnalyzer):
             return top._sons[0]
         
         def pop_action(function, stack):
+            # 最大的问题，使用pop遍历，是反向遍历有向图，无法复现data flow，完全是假的taint analysis
+            # e.g.  tmp = a; b = a; 不能得到 a taints b
             node = stack.pop()
             # variables read at current node
             r_vars = [r_var for r_var in node._vars_read if r_var != None]
@@ -388,16 +390,19 @@ class StaticAnalyzer(IrAnalyzer):
                 # Make taint mark of taintList
                 if var in function.taintList:
                     for w_var in node._vars_written:
-                        if not (w_var in function.taintList[var]):
+                        # 没有检查w_var是不是sink
+                        if w_var in function.taintSink and w_var not in function.taintList[var]:
                             function.taintList[var].append(w_var)
                 # Make taint mark of branch node_vars
                 total_br_taint = []
                 for br_taintList in function.current_br_taint:
                     total_br_taint.extend(br_taintList)
-                if var in total_br_taint:
-                    for w_var in node._vars_written:
-                        if not (w_var in function.taintList[var]):
-                            function.taintList[var].append(w_var)
+                # 没搞懂，total_br_taint 是 taintList.keys()子集，和391行完全重复
+                # 不应该判断var in total_br_taint，而是直接添加total_br_taint
+                # if var in total_br_taint:
+                #     for w_var in node._vars_written:
+                #         if not (w_var in function.taintList[var]):
+                #             function.taintList[var].append(w_var)
         
         # main part of taint_analysis
         stack = []

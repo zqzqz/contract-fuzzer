@@ -130,6 +130,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
             logger.info(filename)
             full_filename = os.path.join(datadir, filename)
             contract_name = filename.split('.')[0].split("#")[-1]
+            # print("filename", filename)
 
             if filename not in report:
                 report[filename] = {}
@@ -173,6 +174,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                     except Exception as e:
                         logger.exception("__main__.baseline: {}".format(str(e)))
                         reward, done, timeout = 0, 0, 0
+                    # print("reward", reward)
 
                     if timeout:
                         logger.info("contract {} finished with counter {}".format(
