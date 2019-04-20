@@ -435,6 +435,7 @@ class StaticAnalyzer(IrAnalyzer):
                 copy_taint(node.fathers[0],node)
                 # add corresponding br_mark of IF
                 function.current_br_taint.append(function.branch_taint[node.node_id])
+                return
 
 
             # END_IF node
