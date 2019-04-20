@@ -143,6 +143,34 @@ class StaticAnalyzer(IrAnalyzer):
                                     function.report[len(function.report) - 1]["deps"].append(source)
             except: continue
             else: pass
+        
+        '''
+        Add condition dependance into report
+        First transform function.conditionList from {key=mark:value=sink} to {key=sink:value=mark}
+        '''
+        new_condition_list = {}
+        for mark in function.conditionList:
+            for var in function.conditionList[mark]:
+                if not(var in new_condition_list):
+                    new_condition_list[var]=[mark]
+                elif not(mark in new_condition_list):
+                    new_condition_list[var].append(mark)
+
+        print("show new condition list\n")
+        for mark in new_condition_list:
+            print('the mark is ', mark._name, ", effect:")
+            list = []
+            for v in new_condition_list[mark]:
+                list.append(v.name)
+            print(list)
+
+        for var in new_condition_list:
+            function.report.append({
+                "var": var,
+                "op": "condition",
+                "deps": new_condition_list[var]
+            })
+            
         for report_line in function.report:
             report_line["func"] = function
         return function.report
@@ -329,6 +357,7 @@ class StaticAnalyzer(IrAnalyzer):
                 function.taintSource = []  # taintMark=None
                 function.taintSink = []
                 function.taintList = {}  # key:mark; value:[v1,v2...]
+                function.conditionList = {} # key:mark; value:[v1,v2..sink]
                 function.branch_taint = {}  # key:_node_id; value:[v1,v2..nodo._vars_read]
                 function.current_br_taint = []
                 function.setSource = MethodType(setSource, function)
@@ -338,6 +367,7 @@ class StaticAnalyzer(IrAnalyzer):
                 for node in function.nodes:
                     node._taintList = {} # key:mark; value:[v1,v2...]
                     node._tainted = {} # key: the vars which has been tainted (except marks); value:mark
+                    node._condition = {} # key:var; value:[v1,v2..souce]
                     node._IsParsed = False
                     node._toParse = True
 
@@ -493,25 +523,42 @@ class StaticAnalyzer(IrAnalyzer):
             total_br_taint = []
             tmp_1 = []
             tmp_2 = []
+            '''
+            Collect all variables in conditions at this node together into tmp_1
+            '''
             for br in function.current_br_taint:
                 tmp_1.extend(br)
+            '''
+            Drop the duplicate variables (tmp_2 contains source, sink and other variables
+            '''
             for var in tmp_1:
                 if not(var in tmp_2):
                     tmp_2.append(var)
+            '''
+            deal with var which is tainted by source
+            '''
             for var in tmp_2:
                 if not(var in node._tainted): continue
                 for mark in node._tainted[var]:
                     if not(mark in total_br_taint):
                         total_br_taint.append(mark)
+            
+            '''
+            deal with source in condition expressions
+            '''
+            
+            for var in tmp_2:
+                if var in node._taintList:
+                    if not(var in total_br_taint):
+                        total_br_taint.append(var)
 
-            for var in total_br_taint:
-                for w_var in node._vars_written:
-                    if not (w_var in node._taintList[var]):
-                        node._taintList[var].append(w_var)
-                        if w_var in node._tainted:
-                            node._tainted[w_var].append(var)
-                        else:
-                            node._tainted[w_var] = [var]
+            '''
+            Now the total_br_taint is the list of taint sources which effect the condition
+            of current node.
+            Write relations between var_written and condition source
+            '''
+            for mark in total_br_taint:
+                node._condition[mark] = node._vars_written
 
 
         # main part of taint_analysis
@@ -520,8 +567,40 @@ class StaticAnalyzer(IrAnalyzer):
                 if function.nodes == []: break
                 # Find the entrance of cfg
                 startNode = function.nodes[0]
+                # Parse the dataflow and do taint analysis
                 DFSparse(function,startNode)
-                    
+                # Combine conditions of nodes into conditionList of function
+                condition_all_in_one = {}
+                for node in function.nodes:
+                    for mark in node._condition:
+                        if not(mark in condition_all_in_one):
+                            condition_all_in_one[mark] = node._condition[mark]
+                        else:
+                            for var in node._condition[mark]:
+                                if not(var in condition_all_in_one[mark]):
+                                    condition_all_in_one[mark].append(var)
+                                    
+                # Sort by source type and drop duplicate values which have been written into taintList with same key
+                para_vars = [p_var for p_var in function._parameters if p_var != None]
+                for mark in function._solidity_vars_read:
+                    if mark in condition_all_in_one:
+                        function.conditionList[mark]=[]
+                        for var in condition_all_in_one[mark]:
+                            if not(var in function.taintList[mark]):
+                                function.conditionList[mark].append(var)
+                for mark in function._state_vars_read:
+                    if mark in condition_all_in_one:
+                        function.conditonList[mark]=[]
+                        for var in condition_all_in_one[mark]:
+                            if not(var in function.taintList[mark]):
+                                function.conditonList[mark].append(var)
+                for mark in para_vars:
+                    if mark in condition_all_in_one:
+                        function.conditionList[mark]=[]
+                        for var in condition_all_in_one[mark]:
+                            if not(var in function.taintList[mark]):
+                                function.conditionList[mark].append(var)
+      
     def run(self, debug=0):
         """
             return an AnalysisReport object, the report has the format:
