@@ -638,12 +638,13 @@ class StaticAnalyzer(IrAnalyzer):
                             if not (var in function.taintList[mark]):
                                 function.conditionList[mark].append(var)
 
-                # for mark in function.conditonList:
-                #     print('the mark is ', mark._name, ", effect:")
-                #     list = []
-                #     for v in function.conditonList[mark]:
-                #         list.append(v.name)
-                #     print(list)
+                print("function's conditionList")
+                for mark in function.conditionList:
+                    print('the mark is ', mark._name, ", condition effect:")
+                    list = []
+                    for v in function.conditionList[mark]:
+                        list.append(v.name)
+                    print(list)
 
     def run(self, debug=0):
         """
@@ -695,9 +696,6 @@ def test():
                     list.append(v.name)
                 print(list)
 
-            print("Next, show branch taint: \n")
-            for i in fun.branch_taint:
-                print('node ', i, ' br_taint is ', [var._name for var in fun.branch_taint[i]])
             static_analyzer._parse_function_for_report(fun)
 
 
