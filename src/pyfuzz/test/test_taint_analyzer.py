@@ -451,6 +451,7 @@ class StaticAnalyzer(IrAnalyzer):
                 copy_taint(node.fathers[0], node)
                 # add corresponding br_mark of IF
                 function.current_br_taint.append(function.branch_taint[node.node_id])
+                return
 
 
             # END_IF node
@@ -625,26 +626,32 @@ class StaticAnalyzer(IrAnalyzer):
                         for var in condition_all_in_one[mark]:
                             if not (var in function.taintList[mark]):
                                 function.conditionList[mark].append(var)
+                        if not(function.conditionList[mark]):
+                            del function.conditionList[mark]                                
                 for mark in function._state_vars_read:
                     if mark in condition_all_in_one:
                         function.conditonList[mark] = []
                         for var in condition_all_in_one[mark]:
                             if not (var in function.taintList[mark]):
                                 function.conditonList[mark].append(var)
+                        if not(function.conditionList[mark]):
+                            del function.conditionList[mark]                                
                 for mark in para_vars:
                     if mark in condition_all_in_one:
                         function.conditionList[mark] = []
                         for var in condition_all_in_one[mark]:
                             if not (var in function.taintList[mark]):
                                 function.conditionList[mark].append(var)
-
-                print("function's conditionList")
-                for mark in function.conditionList:
-                    print('the mark is ', mark._name, ", condition effect:")
-                    list = []
-                    for v in function.conditionList[mark]:
-                        list.append(v.name)
-                    print(list)
+                        if not(function.conditionList[mark]):
+                            del function.conditionList[mark]
+                            
+#                 print("function's conditionList")
+#                 for mark in function.conditionList:
+#                     print('the mark is ', mark._name, ", condition effect:")
+#                     list = []
+#                     for v in function.conditionList[mark]:
+#                         list.append(v.name)
+#                     print(list)
 
     def run(self, debug=0):
         """
@@ -689,10 +696,18 @@ def test():
             print(fun._name)
             print('source:\n', [var.name for var in fun.taintSource])
             print('sink:\n', [var.name for var in fun.taintSink])
+            print("taintList")
             for var in fun.taintList:
-                print('the var is ', var._name, ", taint:")
+                print('the var is ',var._name,", taint:")
                 list = []
                 for v in fun.taintList[var]:
+                    list.append(v.name)
+                print(list)
+            print("conditionList")
+            for mark in fun.conditionList:
+                print('the mark is ', mark._name, ", condition effect:")
+                list = []
+                for v in fun.conditionList[mark]:
                     list.append(v.name)
                 print(list)
 
