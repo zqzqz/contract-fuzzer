@@ -292,16 +292,17 @@ class StaticAnalyzer(IrAnalyzer):
     def pre_taint(self):
         '''
         Source and Sink list contains:
-        1. function._parameters;
-        2. function._solidity_vars_read: like msg.sender, msg.value; in the following url:
+        1. function._solidity_vars_read: like msg.sender, msg.value; in the following url:
                 https://github.com/crytic/slither/blob/master/slither/core/declarations/solidity_variables.py
-        3. function._state_vars_read/write: like balance[addr]..., they are declared in current contract
+        2. function._state_vars_read/write: like balance[addr]..., they are declared in current contract
+        3. function._parameters;
+        form Source list by the order of solidity_vars, state_vars, paras
         '''
         def setSource(self):
             para_vars = [p_var for p_var in self._parameters if p_var != None]
-            self.taintSource.extend(para_vars)
             self.taintSource.extend(self._solidity_vars_read)
             self.taintSource.extend(self._state_vars_read)
+            self.taintSource.extend(para_vars)
             for var in self.taintSource:
                 self.taintList[var] = []
                 for node in self.nodes:
@@ -313,13 +314,10 @@ class StaticAnalyzer(IrAnalyzer):
         def set_br_taint(self):
             for node in self.nodes:
                 if (hex(node._node_type) in ['0x12', '0x15']):
-                    self.branch_taint[node._node_id] = []
                     r_vars = [r_var for r_var in node._vars_read if r_var != None]
-                    for var in r_vars:
-                        if var in function.taintList:
-                            self.branch_taint[node._node_id].append(var)
+                    self.branch_taint[node._node_id] = r_vars
 
-
+        # main code of pre_taint
         for contract in self.contracts:
             for function in contract.functions:
                 '''
@@ -331,7 +329,7 @@ class StaticAnalyzer(IrAnalyzer):
                 function.taintSource = []  # taintMark=None
                 function.taintSink = []
                 function.taintList = {}  # key:mark; value:[v1,v2...]
-                function.branch_taint = {}  # key:_node_id; value:[v1,v2..]
+                function.branch_taint = {}  # key:_node_id; value:[v1,v2..nodo._vars_read]
                 function.current_br_taint = []
                 function.setSource = MethodType(setSource, function)
                 function.setSink = MethodType(setSink, function)
@@ -387,8 +385,11 @@ class StaticAnalyzer(IrAnalyzer):
                         son._tainted = node._tainted.copy()
                         return
                     DFSparse(function, son)
-            # filter the taintlist of exitNode and add to function's taintList
+            # filter the taintlist of exitNode and add to function's taintList after sorting
             else:
+                '''
+                Filter the taintlist of exitNode: keep Sink and drop others
+                '''
                 for mark in node._taintList:
                     for var in node._taintList[mark]:
                         if var in function.taintSink:
@@ -433,28 +434,30 @@ class StaticAnalyzer(IrAnalyzer):
                     node._taintList = node.fathers[0]._taintList.copy()
                     node._tainted = node.fathers[0]._tainted.copy()
                     # add corresponding br_mark of IF_LOOP
-                    for br_mark in function.branch_taint[node._node_id]:
-                        if not (br_mark in node._taintList):
-                            node._taintList[br_mark] = [br_mark]
-                        else:
-                            pass
                     function.current_br_taint.append(function.branch_taint[node.node_id])
                 else:pass
                 return
 
             # END_LOOP node
-            elif (hex(node._node_type) == '0x15'):
+            elif (hex(node._node_type) == '0x52'):
                 # inherit from a single parent of two parents
                 copy_taint(node.fathers[0], node)
                 # drop the finished branch taint
                 function.current_br_taint.pop()
-
+                retutn
+            
+            # START_LOOP node
+            elif (hex(node._node_type) == '0x51'):
+                # inherit from a single parent of two parents
+                copy_taint(node.fathers[0], node)
+                return
 
             # straight line flow node which has a single parent and a single child
             # inherit from a single parent ( or parent of parents )
             copy_taint(node.fathers[0], node)
             # update taintList and tainted for expression node
             propagation(node)
+            br_taint_effect(function,node)
 
             return
 
@@ -488,18 +491,31 @@ class StaticAnalyzer(IrAnalyzer):
 
         def br_taint_effect(function,node):
             total_br_taint = []
-            tmp = []
+            tmp_1 = []
+            tmp_2 = []
             for br in function.current_br_taint:
-                tmp.extend(br)
-            for taint in tmp:
-                if not(taint in total_br_taint):
-                    total_br_taint.append(taint)
-            #TODO
+                tmp_1.extend(br)
+            for var in tmp_1:
+                if not(var in tmp_2):
+                    tmp_2.append(var)
+            for var in tmp_2:
+                if not(var in node._tainted): continue
+                for mark in node._tainted[var]:
+                    if not(mark in total_br_taint):
+                        total_br_taint.append(mark)
+
+            for var in total_br_taint:
+                for w_var in node._vars_written:
+                    if not (w_var in node._taintList[var]):
+                        node._taintList[var].append(w_var)
+                        if w_var in node._tainted:
+                            node._tainted[w_var].append(var)
+                        else:
+                            node._tainted[w_var] = [var]
 
 
         # main part of taint_analysis
         for contract in self.contracts:
-            print('\ncurrent contract is:  ', contract.name, "\n")
             for function in contract.functions:
                 if function.nodes == []: break
                 # Find the entrance of cfg
