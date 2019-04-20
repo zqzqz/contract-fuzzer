@@ -588,18 +588,24 @@ class StaticAnalyzer(IrAnalyzer):
                         for var in condition_all_in_one[mark]:
                             if not(var in function.taintList[mark]):
                                 function.conditionList[mark].append(var)
+                        if not(function.conditionList[mark]):
+                            del function.conditionList[mark]                                
                 for mark in function._state_vars_read:
                     if mark in condition_all_in_one:
                         function.conditonList[mark]=[]
                         for var in condition_all_in_one[mark]:
                             if not(var in function.taintList[mark]):
                                 function.conditonList[mark].append(var)
+                        if not(function.conditionList[mark]):
+                            del function.conditionList[mark]                                
                 for mark in para_vars:
                     if mark in condition_all_in_one:
                         function.conditionList[mark]=[]
                         for var in condition_all_in_one[mark]:
                             if not(var in function.taintList[mark]):
                                 function.conditionList[mark].append(var)
+                        if not(function.conditionList[mark]):
+                            del function.conditionList[mark]
       
     def run(self, debug=0):
         """
