@@ -474,7 +474,7 @@ class StaticAnalyzer(IrAnalyzer):
                 copy_taint(node.fathers[0], node)
                 # drop the finished branch taint
                 function.current_br_taint.pop()
-                retutn
+                return
             
             # START_LOOP node
             elif (hex(node._node_type) == '0x51'):
