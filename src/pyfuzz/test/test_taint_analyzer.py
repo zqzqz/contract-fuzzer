@@ -5,13 +5,14 @@ from types import MethodType
 import slither
 import os
 
+
 def print_reports(reports):
     if isinstance(reports, list):
         for report in reports:
             print_reports(report)
     elif isinstance(reports, dict):
         for key in list(reports.keys()):
-            print("<"+key+">", end=' ')
+            print("<" + key + ">", end=' ')
             print_reports(reports[key])
         print()
     else:
@@ -27,7 +28,7 @@ class AnalysisReport():
         self.max_line_num = ANALYSIS_CONFIG["max_line_num"]
         self.max_length = ANALYSIS_CONFIG["max_length"]
         for function in contract.functions:
-            if not(function.visibility in ["public","external"]):
+            if not (function.visibility in ["public", "external"]):
                 continue
             full_name = function.full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
@@ -104,7 +105,7 @@ class StaticAnalyzer(IrAnalyzer):
             for source in function.taintSource:
                 if var in function.taintList[source]:
                     function.report[len(function.report) - 1]["deps"].append(source)
-        
+
         '''
         add external_calls into report
         here only consider about send and transfer with certain format args
@@ -117,7 +118,7 @@ class StaticAnalyzer(IrAnalyzer):
                     _to = ex_call.called.expression
                     while isinstance(_to, slither.core.expressions.member_access.MemberAccess):
                         _to = _to.expression
-                    _to = _to.value # address, like msg.sender
+                    _to = _to.value  # address, like msg.sender
                     # format like: msg.sender.transfer(payments[msg.sender]);
                     if isinstance(ex_call.arguments[0], slither.core.expressions.index_access.IndexAccess):
                         index_left = ex_call.arguments[0].expression_left.value  # state value
@@ -125,25 +126,54 @@ class StaticAnalyzer(IrAnalyzer):
                         function.report.append({
                             "var": _to,
                             "op": op,
-                            "deps":[index_left,index_right]
+                            "deps": [index_left, index_right]
                         })
-                        for var in [index_left,index_right]:
+                        for var in [index_left, index_right]:
                             for source in function.taintSource:
                                 if var in function.taintList[source]:
-                                    if not(source in function.report[len(function.report) - 1]["deps"]):
+                                    if not (source in function.report[len(function.report) - 1]["deps"]):
                                         function.report[len(function.report) - 1]["deps"].append(source)
-                    else: # format like: msg.sender.transfer(msg.value)
+                    else:  # format like: msg.sender.transfer(msg.value)
                         function.report.append({
                             "var": _to,
                             "op": op,
-                            "deps":[ex_call.arguments[0].value]
+                            "deps": [ex_call.arguments[0].value]
                         })
                         for source in function.taintSource:
                             if ex_call.arguments[0].value in function.taintList[source]:
                                 if not (source in function.report[len(function.report) - 1]["deps"]):
                                     function.report[len(function.report) - 1]["deps"].append(source)
-            except: continue
-            else: pass
+            except:
+                continue
+            else:
+                pass
+        '''
+               Add condition dependance into report
+               First transform function.conditionList from {key=mark:value=sink} to {key=sink:value=mark}
+               '''
+        new_condition_list = {}
+        for mark in function.conditionList:
+            for var in function.conditionList[mark]:
+                if not (var in new_condition_list):
+                    new_condition_list[var] = [mark]
+                elif not (mark in new_condition_list):
+                    new_condition_list[var].append(mark)
+
+        print("show new condition list\n")
+        for mark in new_condition_list:
+            print('the mark is ', mark._name, ", effect:")
+            list = []
+            for v in new_condition_list[mark]:
+                list.append(v.name)
+            print(list)
+
+        for var in new_condition_list:
+            function.report.append({
+                "var": var,
+                "op": "condition",
+                "deps": new_condition_list[var]
+            })
+
         for report_line in function.report:
             report_line["func"] = function
         return function.report
@@ -165,7 +195,7 @@ class StaticAnalyzer(IrAnalyzer):
         state_vars = contract.state_variables
         simplified_report = []
         write_filter = [var.name for var in state_vars] + \
-            ["msg.sender", "msg.value"]
+                       ["msg.sender", "msg.value"]
         dep_filter = {}
         for report_line in contract.report:
             function = report_line["func"]
@@ -195,6 +225,7 @@ class StaticAnalyzer(IrAnalyzer):
         func_map = {}
         arg_map = {}
         feature_map = {}
+
         # util function, encode zeros when mishitting
 
         def get_code(var, map):
@@ -202,6 +233,7 @@ class StaticAnalyzer(IrAnalyzer):
                 return 0
             else:
                 return map[var]
+
         # encode state variables from 0...
         count = 3
         for state_var in contract.state_variables:
@@ -278,11 +310,13 @@ class StaticAnalyzer(IrAnalyzer):
         for func_hash in encoded_report:
             if func_hash in feature_map:
                 features = feature_map[func_hash]
-                encoded_report[func_hash]["features"] = [features["call"], features["msg"], features["block"], features["args"], features["payable"]]
+                encoded_report[func_hash]["features"] = [features["call"], features["msg"], features["block"],
+                                                         features["args"], features["payable"]]
             else:
                 encoded_report[func_hash]["features"] = [0, 0, 0, 0, 0]
             if len(encoded_report[func_hash]["taint"]) < self.max_length:
-                encoded_report[func_hash]["taint"] += [0 for i in range(self.max_length - len(encoded_report[func_hash]["taint"]))]
+                encoded_report[func_hash]["taint"] += [0 for i in
+                                                       range(self.max_length - len(encoded_report[func_hash]["taint"]))]
             elif len(encoded_report[func_hash]) > self.max_length:
                 encoded_report[func_hash]["taint"] = encoded_report[func_hash]["taint"][:self.max_length]
 
@@ -298,6 +332,7 @@ class StaticAnalyzer(IrAnalyzer):
                 https://github.com/crytic/slither/blob/master/slither/core/declarations/solidity_variables.py
         3. function._state_vars_read/write: like balance[addr]..., they are declared in current contract
         '''
+
         def setSource(self):
             para_vars = [p_var for p_var in self._parameters if p_var != None]
             self.taintSource.extend(self._solidity_vars_read)
@@ -317,7 +352,6 @@ class StaticAnalyzer(IrAnalyzer):
                     r_vars = [r_var for r_var in node._vars_read if r_var != None]
                     self.branch_taint[node._node_id] = r_vars
 
-
         for contract in self.contracts:
             for function in contract.functions:
                 '''
@@ -329,6 +363,7 @@ class StaticAnalyzer(IrAnalyzer):
                 function.taintSource = []  # taintMark=None
                 function.taintSink = []
                 function.taintList = {}  # key:mark; value:[v1,v2...]
+                function.conditionList = {} # key:mark; value:[v1,v2..sink]
                 function.branch_taint = {}  # key:_node_id; value:[v1,v2..]
                 function.current_br_taint = []
                 function.setSource = MethodType(setSource, function)
@@ -336,8 +371,9 @@ class StaticAnalyzer(IrAnalyzer):
                 function.set_br_taint = MethodType(set_br_taint, function)
 
                 for node in function.nodes:
-                    node._taintList = {} # key:mark; value:[v1,v2...]
-                    node._tainted = {} # key: the vars which has been tainted (except marks); value:mark
+                    node._taintList = {}  # key:mark; value:[v1,v2...]
+                    node._tainted = {}  # key: the vars which has been tainted (except marks); value:mark
+                    node._condition = {} # key:var; value:[v1,v2..souce]
                     node._IsParsed = False
                     node._toParse = True
 
@@ -347,7 +383,7 @@ class StaticAnalyzer(IrAnalyzer):
                 function.set_br_taint()
 
     def taint_analysis(self):
-        def DFSparse(function,node):
+        def DFSparse(function, node):
 
             print("current node is: ", node)
             print('expr of this node: ', node._expression)
@@ -357,36 +393,36 @@ class StaticAnalyzer(IrAnalyzer):
             for expr in dom_expr: print(expr, ', ', type(expr))
             dom_expr = [dom._expression for dom in node._sons]
             print('sons are:  ')
-            for expr in dom_expr: print(expr, ', ',type(expr))
+            for expr in dom_expr: print(expr, ', ', type(expr))
 
             # Update toParse state of current node
-            if (node.fathers): # nodes besides STARTPOINT
+            if (node.fathers):  # nodes besides STARTPOINT
                 node._toParse = True
                 for father in node.fathers:
-                    if not(father._IsParsed):
+                    if not (father._IsParsed):
                         node._toParse = False
                         break
 
             # stop forward when current node's toParse is false except for IF_LOOP
-            if (not(node._toParse) and not(hex(node._node_type) == '0x15')):
-                print('stop at node: ', hex(node._node_type),'\n')
+            if (not (node._toParse) and not (hex(node._node_type) == '0x15')):
+                print('stop at node: ', hex(node._node_type), '\n')
                 return
 
             # deal with the case that IF without else
             if node._IsParsed:
                 return
             if (node.fathers):
-                process(function,node)
+                process(function, node)
 
             # Update IsParsed state of current node
             node._IsParsed = True
-            print('current: ',node," finish parse\n")
+            print('current: ', node, " finish parse\n")
             if (node.sons):
                 # deal with for-loop whose sons order is different
                 if (hex(node._node_type) == '0x15'):
                     if (hex(node.sons[0]._node_type) == '0x52'):
-                        DFSparse(function,node.sons[1])
-                        DFSparse(function,node.sons[0])
+                        DFSparse(function, node.sons[1])
+                        DFSparse(function, node.sons[0])
                         return
                 # normal sons order
                 for son in node.sons:
@@ -406,13 +442,13 @@ class StaticAnalyzer(IrAnalyzer):
                             function.taintList[mark].append(var)
             return
 
-        def process(function,node):
+        def process(function, node):
             # extra policy for branch nodes or expression nodes
             # TODO : how to deal with if(address.call.value())
             # IF node
             if (hex(node._node_type) == '0x12'):  # IF
                 # inherit from a single parent
-                copy_taint(node.fathers[0],node)
+                copy_taint(node.fathers[0], node)
                 # add corresponding br_mark of IF
                 function.current_br_taint.append(function.branch_taint[node.node_id])
 
@@ -420,16 +456,16 @@ class StaticAnalyzer(IrAnalyzer):
             # END_IF node
             elif (hex(node._node_type) == '0x50'):
                 # inherit from a single parent of parents
-                copy_taint(node.fathers[0],node)
+                copy_taint(node.fathers[0], node)
                 # Combine two father into a single son
                 for var in node.fathers[1]._tainted:
-                    if not(var in node._tainted):
+                    if not (var in node._tainted):
                         node._tainted[var] = (node.fathers[1]._tainted[var])
                         for mark in node.fathers[1]._tainted[var]:
                             node._taintList[mark].append(var)
                     else:
                         for mark in node.fathers[1]._tainted[var]:
-                            if not(mark in node._tainted[var]):
+                            if not (mark in node._tainted[var]):
                                 node._tainted[var].append(mark)
                                 node._taintList[mark].append(var)
                 # drop the finished branch taint
@@ -440,12 +476,13 @@ class StaticAnalyzer(IrAnalyzer):
             elif (hex(node._node_type) == '0x15'):
                 # inherit from a single parent of two parents
                 copy_taint(node.fathers[0], node)
-                if not(node._toParse):
+                if not (node._toParse):
                     node._taintList = node.fathers[0]._taintList.copy()
                     node._tainted = node.fathers[0]._tainted.copy()
                     # add corresponding br_mark of IF_LOOP
                     function.current_br_taint.append(function.branch_taint[node.node_id])
-                else:pass
+                else:
+                    pass
                 return
 
             # END_LOOP node
@@ -462,22 +499,21 @@ class StaticAnalyzer(IrAnalyzer):
                 copy_taint(node.fathers[0], node)
                 return
 
-
             # straight line flow node which has a single parent and a single child
             # inherit from a single parent ( or parent of parents )
             copy_taint(node.fathers[0], node)
             # update taintList and tainted for expression node
             propagation(node)
-            br_taint_effect(function,node)
+            br_taint_effect(function, node)
 
             return
 
-        def copy_taint(from_node,to_node):
+        def copy_taint(from_node, to_node):
             for mark in from_node._taintList:
                 to_node._taintList[mark] = from_node._taintList[mark][:]
             for var in from_node._tainted:
-                if not(var in to_node._tainted):
-                    to_node._tainted[var]=from_node._tainted[var][:]
+                if not (var in to_node._tainted):
+                    to_node._tainted[var] = from_node._tainted[var][:]
 
         def propagation(node):
             r_vars = [r_var for r_var in node._vars_read if r_var != None]
@@ -500,30 +536,59 @@ class StaticAnalyzer(IrAnalyzer):
                                 else:
                                     node._tainted[w_var] = [mark]
 
-        def br_taint_effect(function,node):
+        '''
+                Add condition taint information
+                '''
+
+        def br_taint_effect(function, node):
             total_br_taint = []
             tmp_1 = []
             tmp_2 = []
+            '''
+            Collect all variables in conditions at this node together into tmp_1
+            '''
             for br in function.current_br_taint:
                 tmp_1.extend(br)
+            '''
+            Drop the duplicate variables (tmp_2 contains source, sink and other variables
+            '''
             for var in tmp_1:
-                if not(var in tmp_2):
+                if not (var in tmp_2):
                     tmp_2.append(var)
+
+            '''
+            deal with var which is tainted by source
+            '''
             for var in tmp_2:
-                if not(var in node._tainted): continue
+                if not (var in node._tainted): continue
                 for mark in node._tainted[var]:
-                    if not(mark in total_br_taint):
+                    if not (mark in total_br_taint):
                         total_br_taint.append(mark)
 
-            for var in total_br_taint:
-                for w_var in node._vars_written:
-                    if not (w_var in node._taintList[var]):
-                        node._taintList[var].append(w_var)
-                        if w_var in node._tainted:
-                            node._tainted[w_var].append(var)
-                        else:
-                            node._tainted[w_var] = [var]
+            '''
+            deal with source in condition expressions
+            '''
+            for var in tmp_2:
+                if var in node._taintList:
+                    if not (var in total_br_taint):
+                        total_br_taint.append(var)
 
+            # for var in total_br_taint:
+            #     for w_var in node._vars_written:
+            #         if not (w_var in node._taintList[var]):
+            #             node._taintList[var].append(w_var)
+            #             if w_var in node._tainted:
+            #                 node._tainted[w_var].append(var)
+            #             else:
+            #                 node._tainted[w_var] = [var]
+
+            '''
+                        Now the total_br_taint is the list of taint sources which effect the condition
+                        of current node.
+                        Write relations between var_written and condition source
+             '''
+            for mark in total_br_taint:
+                node._condition[mark] = node._vars_written
 
         # main part of taint_analysis
         for contract in self.contracts:
@@ -532,9 +597,54 @@ class StaticAnalyzer(IrAnalyzer):
                 if function.nodes == []: break
                 # Find the entrance of cfg
                 startNode = function.nodes[0]
-                DFSparse(function,startNode)
+                # Parse the dataflow and do taint analysis
+                DFSparse(function, startNode)
+                # Combine conditions of nodes into conditionList of function
+                condition_all_in_one = {}
+                for node in function.nodes:
+                    for mark in node._condition:
+                        if not (mark in condition_all_in_one):
+                            condition_all_in_one[mark] = node._condition[mark]
+                        else:
+                            for var in node._condition[mark]:
+                                if not (var in condition_all_in_one[mark]):
+                                    condition_all_in_one[mark].append(var)
 
-                    
+                # for mark in condition_all_in_one:
+                #     print('the mark is ', mark._name, ", effect:")
+                #     list = []
+                #     for v in condition_all_in_one[mark]:
+                #         list.append(v.name)
+                #     print(list)
+
+                # Sort by source type and drop duplicate values which have been written into taintList with same key
+                para_vars = [p_var for p_var in function._parameters if p_var != None]
+                for mark in function._solidity_vars_read:
+                    if mark in condition_all_in_one:
+                        function.conditionList[mark] = []
+                        for var in condition_all_in_one[mark]:
+                            if not (var in function.taintList[mark]):
+                                function.conditionList[mark].append(var)
+                for mark in function._state_vars_read:
+                    if mark in condition_all_in_one:
+                        function.conditonList[mark] = []
+                        for var in condition_all_in_one[mark]:
+                            if not (var in function.taintList[mark]):
+                                function.conditonList[mark].append(var)
+                for mark in para_vars:
+                    if mark in condition_all_in_one:
+                        function.conditionList[mark] = []
+                        for var in condition_all_in_one[mark]:
+                            if not (var in function.taintList[mark]):
+                                function.conditionList[mark].append(var)
+
+                # for mark in function.conditonList:
+                #     print('the mark is ', mark._name, ", effect:")
+                #     list = []
+                #     for v in function.conditonList[mark]:
+                #         list.append(v.name)
+                #     print(list)
+
     def run(self, debug=0):
         """
             return an AnalysisReport object, the report has the format:
@@ -552,18 +662,18 @@ class StaticAnalyzer(IrAnalyzer):
             Visitor(contract_visitor=self._parse_contract_for_report))
 
         # select main contract
-        contract=self.contract
-        assert(contract != None)
+        contract = self.contract
+        assert (contract != None)
 
-        report=self._simplify_contract_report(contract)
+        report = self._simplify_contract_report(contract)
         if debug:
             print_reports(report)
 
-        encoded_report=self._encode_contract_report(contract)
+        encoded_report = self._encode_contract_report(contract)
         if debug:
             print(encoded_report)
 
-        self.report=AnalysisReport(contract)
+        self.report = AnalysisReport(contract)
         return self.report
 
 
@@ -576,10 +686,10 @@ def test():
     for con in static_analyzer.contracts:
         for fun in con.functions:
             print(fun._name)
-            print('source:\n',[var.name for var in fun.taintSource])
-            print('sink:\n',[var.name for var in fun.taintSink])
+            print('source:\n', [var.name for var in fun.taintSource])
+            print('sink:\n', [var.name for var in fun.taintSink])
             for var in fun.taintList:
-                print('the var is ',var._name,", taint:")
+                print('the var is ', var._name, ", taint:")
                 list = []
                 for v in fun.taintList[var]:
                     list.append(v.name)
@@ -587,7 +697,9 @@ def test():
 
             print("Next, show branch taint: \n")
             for i in fun.branch_taint:
-                print('node ',i,' br_taint is ',[var._name for var in fun.branch_taint[i]])
+                print('node ', i, ' br_taint is ', [var._name for var in fun.branch_taint[i]])
+            static_analyzer._parse_function_for_report(fun)
+
 
 if __name__ == "__main__":
     test()
