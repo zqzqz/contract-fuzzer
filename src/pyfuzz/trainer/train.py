@@ -114,7 +114,7 @@ def deep_q_learning(sess,
         replay_memory.append(Transition(
             state, seq_len, action, reward, next_state, next_seq_len, filename, done))
         if timeout:
-            env.refreshEvm()
+            # env.refreshEvm()
             state, seq_len, filename = env.random_reset(datadir)
         else:
             state = next_state
@@ -132,7 +132,7 @@ def deep_q_learning(sess,
         state, seq_len, filename = env.random_reset(datadir)
         loss = None
 
-        env.refreshEvm()
+        # env.refreshEvm()
 
         # One step in the environment
         for t in itertools.count():

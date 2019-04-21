@@ -45,6 +45,20 @@ EVMHandler = {
   defaultBalance: "ffffffffffffffffffffffffffffffff",
   startTime: new Date().getTime() / 1000 | 0,
   txCnt: 0,
+  contractCount: 0,
+  maxContractCount: 300,
+
+  autoInit: () => {
+    return new Promise((resolve, reject) => {
+      if (EVMHandler.contractCount > EVMHandler.maxContractCount) {
+        EVMHandler.init().then(() => {
+          resolve();
+        })
+      } else {
+        resolve();
+      }
+    })
+  },
 
   init: () => {
     return new Promise((resolve, reject) => {
@@ -59,6 +73,7 @@ EVMHandler = {
         })
         EVMHandler.startTime = new Date().getTime() / 1000 | 0
         EVMHandler.txCnt = 0
+        EVMHandler.contractCount = 0
         resolve();
       })
     });
@@ -146,7 +161,10 @@ EVMHandler = {
   // deploy a new contract; take compiled contract from solc as input
   deploy: (contract) => {
     return new Promise((resolve, reject) => {
-      EVMHandler.resetBalance(EVMHandler.defaultBalance).then(() => {
+      EVMHandler.contractCount += 1;
+      EVMHandler.autoInit().then(() => {
+        return EVMHandler.resetBalance(EVMHandler.defaultBalance);
+      }).then(() => {
         EVMHandler.sendTx(EVMHandler.defaultAccount, EVMHandler.defaultContractAddress, "0", contract.bytecode).then((result) => {
           if (!result.createdAddress && (!EVMHandler.defaultContractAddress || EVMHandler.defaultContractAddress == ""))
             reject(Error("Invalid contract address"));

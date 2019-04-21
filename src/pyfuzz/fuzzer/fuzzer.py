@@ -84,6 +84,9 @@ class Fuzzer():
                 with open(filename, "r") as f:
                     source = f.read()
                 self.contract = self.evm.compile(source, contract_name)
+                contractAddress = self.evm.deploy(self.contract)
+                if not contractAddress:
+                    return False
                 self.contractAbi = ContractAbi(self.contract)
                 # run static analysis
                 self.staticAnalyzer.load_contract(filename, contract_name)

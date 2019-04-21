@@ -90,6 +90,19 @@ class StaticAnalyzer(IrAnalyzer):
                     function.features["msg"] += 1
                 elif v.name.find("block.") >= 0:
                     function.features["block"] += 1
+
+        '''
+        Add condition dependance into report
+        First transform function.conditionList from {key=mark:value=sink} to {key=sink:value=mark}
+        '''
+        new_condition_list = {}
+        for mark in function.conditionList:
+            for var in function.conditionList[mark]:
+                if not(var in new_condition_list):
+                    new_condition_list[var]=[mark]
+                elif not(mark in new_condition_list):
+                    new_condition_list[var].append(mark)
+
         '''
         the key("var") in report is just taintSink or all the variable(sink_taint)
         need to discuss
@@ -101,8 +114,11 @@ class StaticAnalyzer(IrAnalyzer):
                 "deps": []
             })
             for source in function.taintSource:
-                if var in function.taintList[source]:
-                    function.report[len(function.report) - 1]["deps"].append(source)
+                if var in function.taintList[source] and source not in function.report[-1]["deps"]:
+                    function.report[-1]["deps"].append(source)
+            for mark in new_condition_list:
+                if var in new_condition_list[mark] and mark not in function.report[-1]["deps"]:
+                    function.report[-1]["deps"].append(mark)
         
         '''
         add external_calls into report
@@ -124,13 +140,16 @@ class StaticAnalyzer(IrAnalyzer):
                         function.report.append({
                             "var": _to,
                             "op": op,
-                            "deps":[index_left,index_right]
+                            "deps":[]
                         })
-                        for var in [index_left,index_right]:
+                        for var in [index_left, index_right]:
+                            if var in function.taintSource:
+                                if var not in function.report[-1]["deps"]:
+                                    function.report[-1]["deps"].append(var)                                
                             for source in function.taintSource:
                                 if var in function.taintList[source]:
-                                    if not(source in function.report[len(function.report) - 1]["deps"]):
-                                        function.report[len(function.report) - 1]["deps"].append(source)
+                                    if source not in function.report[-1]["deps"]:
+                                        function.report[-1]["deps"].append(source)
                     else: # format like: msg.sender.transfer(msg.value)
                         function.report.append({
                             "var": _to,
@@ -144,33 +163,6 @@ class StaticAnalyzer(IrAnalyzer):
             except: continue
             else: pass
         
-        '''
-        Add condition dependance into report
-        First transform function.conditionList from {key=mark:value=sink} to {key=sink:value=mark}
-        '''
-        new_condition_list = {}
-        for mark in function.conditionList:
-            for var in function.conditionList[mark]:
-                if not(var in new_condition_list):
-                    new_condition_list[var]=[mark]
-                elif not(mark in new_condition_list):
-                    new_condition_list[var].append(mark)
-
-        print("show new condition list\n")
-        for mark in new_condition_list:
-            print('the mark is ', mark._name, ", effect:")
-            list = []
-            for v in new_condition_list[mark]:
-                list.append(v.name)
-            print(list)
-
-        for var in new_condition_list:
-            function.report.append({
-                "var": var,
-                "op": "condition",
-                "deps": new_condition_list[var]
-            })
-            
         for report_line in function.report:
             report_line["func"] = function
         return function.report
@@ -229,14 +221,14 @@ class StaticAnalyzer(IrAnalyzer):
                 return 0
             else:
                 return map[var]
-        # encode state variables from 0...
+        # encode state variables from 3...
         count = 3
         for state_var in contract.state_variables:
             state_var_map[str(state_var)] = count
             state_var.encode_id = count
             if (count + 1) <= self.max_token_value:
                 count += 1
-        # encode functions from 0...
+        # encode functions from 1...
         count = 1
         for function in contract.functions:
             # init encoded report
@@ -277,7 +269,7 @@ class StaticAnalyzer(IrAnalyzer):
 
             count = 0
             for dep in report_line["deps"]:
-                if count > self.max_dep_num:
+                if count >= self.max_dep_num:
                     break
                 code = 0
                 # it is solidity argument
@@ -443,16 +435,17 @@ class StaticAnalyzer(IrAnalyzer):
                 # inherit from a single parent of parents
                 copy_taint(node.fathers[0],node)
                 # Combine two father into a single son
-                for var in node.fathers[1]._tainted:
-                    if not(var in node._tainted):
-                        node._tainted[var] = (node.fathers[1]._tainted[var])
-                        for mark in node.fathers[1]._tainted[var]:
-                            node._taintList[mark].append(var)
-                    else:
-                        for mark in node.fathers[1]._tainted[var]:
-                            if not(mark in node._tainted[var]):
-                                node._tainted[var].append(mark)
+                if len(node.fathers) > 1:
+                    for var in node.fathers[1]._tainted:
+                        if not(var in node._tainted):
+                            node._tainted[var] = (node.fathers[1]._tainted[var])
+                            for mark in node.fathers[1]._tainted[var]:
                                 node._taintList[mark].append(var)
+                        else:
+                            for mark in node.fathers[1]._tainted[var]:
+                                if not(mark in node._tainted[var]):
+                                    node._tainted[var].append(mark)
+                                    node._taintList[mark].append(var)
                 # drop the finished branch taint
                 function.current_br_taint.pop()
                 return
@@ -593,10 +586,10 @@ class StaticAnalyzer(IrAnalyzer):
                             del function.conditionList[mark]                                
                 for mark in function._state_vars_read:
                     if mark in condition_all_in_one:
-                        function.conditonList[mark]=[]
+                        function.conditionList[mark]=[]
                         for var in condition_all_in_one[mark]:
                             if not(var in function.taintList[mark]):
-                                function.conditonList[mark].append(var)
+                                function.conditionList[mark].append(var)
                         if not(function.conditionList[mark]):
                             del function.conditionList[mark]                                
                 for mark in para_vars:
