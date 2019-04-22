@@ -52,7 +52,7 @@ def fuzz(datadir, rand_prob, opts):
 
         contract_files = os.listdir(datadir)
         for filename in contract_files:
-            env.refreshEvm()
+            # env.refreshEvm()
             full_filename = os.path.join(datadir, filename)
             contract_name = filename.split('.')[0].split("#")[-1]
             
@@ -126,7 +126,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
 
         contract_files = os.listdir(datadir)
         for filename in contract_files:
-            env.refreshEvm()
+            # env.refreshEvm()
             logger.info(filename)
             full_filename = os.path.join(datadir, filename)
             contract_name = filename.split('.')[0].split("#")[-1]
@@ -139,7 +139,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
 
             if not env.loadContract(full_filename, contract_name):
                 continue
-
+            
             for i in range(repeat_num):
                 report[filename][i] = {
                     "reports": [],
@@ -151,7 +151,8 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                 state, seq_len = env.reset()
                 report_num = 0
                 while True:
-                    # print(env.state.txList)
+                    # test
+                    # env.printTxList()
                     try:
                         if rand_prob < 1.0:
                             feed_dict = {X: np.expand_dims(
@@ -168,6 +169,7 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                         state, seq_len, reward, done, timeout = env.step(action)
 
                         for r in range(report_num, len(env.report)):
+                            # logger.info("Found:", repr(env.report[r]))
                             report[filename][i]["reports"].append({"report": repr(env.report[r]), "attempt": env.counter})
                         report_num = len(env.report)
 

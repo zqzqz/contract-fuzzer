@@ -343,11 +343,15 @@ class Fuzzer():
         else:
             return len(self.contractMap[self.filename]["visited"]) / jump_cnt
 
-    @staticmethod
-    def printTxList(txList):
-        print("txList:")
+    def printTxList(self):
+        print("TX LIST:")
+        txList = self.state.txList
         for i in range(len(txList)):
             if not txList[i]:
                 continue
-            print("[{}] payload: {}, sender: {}, value: {}, visited: {}, total_visited: {}".format(
-                str(i), txList[i].payload, txList[i].sender, txList[i].value, txList[i].tmp_visited, txList[i].total_visited))
+            function = ""
+            abi = self.contractAbi.interface[txList[i].hash]
+            if "name" in abi:
+                function = abi["name"]
+            print("[{}] function: {}, args: {}, sender: {}, value: {}".format(
+                str(i), function, txList[i].args, txList[i].sender[:4], txList[i].value))

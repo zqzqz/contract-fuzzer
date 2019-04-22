@@ -24,8 +24,8 @@ TRAIN_CONFIG["max_line_length"] = TRAIN_CONFIG["token_size"] * (ANALYSIS_CONFIG[
 FUZZ_CONFIG = {
     "seed_prob": 0.6,
     "random_action_prob": 0.6,
-    "account_balance": "0xffffffffffffffffffffffffffffffffff",
-    "max_attempt": 10,
+    "account_balance": "0xffffffffffffffffffffffffffffffff",
+    "max_attempt": 100,
     "valid_mutation_reward": 1,
     "vulnerability_reward": 1,
     "exploit_reward": 2,

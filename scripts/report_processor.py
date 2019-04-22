@@ -14,10 +14,15 @@ def list_all_contracts(datapath):
 def select_success(filepath):
     with open(filepath, "r") as f:
         report = json.load(f)
+    total = 0
+    select = 0
 
     for filename in report:
-        if len(report[filename]["success"]) > 5:
+        total += 1
+        if str(report[filename]).count("exploit") > 0:
             print(filename)
+            select += 1
+    print(select, total, select/total)
 
 def compare_reports(filepath0, filepath1):
     with open(filepath0, "r") as f:
@@ -43,4 +48,5 @@ def compare_reports(filepath0, filepath1):
             pass
     print("total", a / total, b / total)
 
-list_all_contracts("/home/zqz/teether_contract")
+# list_all_contracts("/home/zqz/teether_contract")
+select_success("report.json")
