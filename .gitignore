@@ -11,4 +11,5 @@ experiments*
 *.pyc
 report.json
 /scripts/*.txt
+/scripts/*.json
 *.tar.gz

@@ -22,7 +22,7 @@ ANALYSIS_CONFIG["max_length"] = ANALYSIS_CONFIG["max_line_num"] * (ANALYSIS_CONF
 TRAIN_CONFIG["max_line_length"] = TRAIN_CONFIG["token_size"] * (ANALYSIS_CONFIG["max_length"] + 2) + TRAIN_CONFIG["feature_size"] * ANALYSIS_CONFIG["feature_num"]
 
 FUZZ_CONFIG = {
-    "seed_prob": 0.6,
+    "seed_prob": 0.4,
     "random_action_prob": 0.6,
     "account_balance": "0xffffffffffffffffffffffffffffffff",
     "max_attempt": 100,
@@ -30,7 +30,7 @@ FUZZ_CONFIG = {
     "vulnerability_reward": 1,
     "exploit_reward": 2,
     "path_variaty_reward": 0.5,
-    "path_discovery_reward": 0.2
+    "path_discovery_reward": 0.3
 }
 
 DIR_CONFIG = {}

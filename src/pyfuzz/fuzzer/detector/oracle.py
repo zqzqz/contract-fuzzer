@@ -28,9 +28,6 @@ class Oracle():
         self.name = name
         self.results = []
 
-    def reset(self):
-        self.results = []
-
     @property
     def triggered(self):
         return len(self.results) > 0
@@ -43,23 +40,55 @@ class Oracle():
     def run_step(self, step):
         pass
 
+    def reset(self):
+        self.results = []
+
 
 class TimestampOpOracle(Oracle):
     def __init__(self):
         super().__init__("TimestampOp")
+        self.res_stat = 0
+        self.res_pcs = []
 
     def run_step(self, step):
         if step["op"] == "TIMESTAMP":
-            self.results.append(OracleReport(self.name, 1, step["pc"]))
+            if self.res_stat == 0:
+                self.res_stat += 1
+            self.res_pcs.append(step["pc"])
+        if step["op"] in ["CALL", "CALLCODE", "DELEGATECALL"]:
+            if self.res_stat == 1:
+                self.res_stat = 0
+                for pc in self.res_pcs:
+                    self.results.append(OracleReport(self.name, 1, pc))
+                self.res_pcs = []
 
+    def reset(self):
+        super().reset()
+        self.res_stat = 0
+        self.res_pcs = []
 
 class BlockNumOpOracle(Oracle):
     def __init__(self):
         super().__init__("BlockNumOp")
+        self.res_stat = 0
+        self.res_pcs = []
 
     def run_step(self, step):
         if step["op"] == "NUMBER":
-            self.results.append(OracleReport(self.name, 1, step["pc"]))
+            if self.res_stat == 0:
+                self.res_stat += 1
+            self.res_pcs.append(step["pc"])
+        if step["op"] in ["CALL", "CALLCODE", "DELEGATECALL"]:
+            if self.res_stat == 1:
+                self.res_stat = 0
+                for pc in self.res_pcs:
+                    self.results.append(OracleReport(self.name, 1, pc))
+                self.res_pcs = []
+
+    def reset(self):
+        super().reset()
+        self.res_stat = 0
+        self.res_pcs = []
 
 
 class EtherTransferOracle(Oracle):
@@ -114,6 +143,10 @@ class ExceptionOracle(Oracle):
                 self.results.append(OracleReport(self.name, 1, self.call_pc))
             self.call_pc = -1
 
+    def reset(self):
+        super().reset()
+        self.call_pc = -1
+
 
 class RevertOracle(Oracle):
     def __init__(self):
@@ -150,6 +183,10 @@ class ReentrancyOracle(Oracle):
         if self.call_pc > 0 and step["op"] in self.write_op_list:
             self.results.append(OracleReport(self.name, 1, self.call_pc))
             self.call_pc = -1
+
+    def reset(self):
+        super().reset()
+        self.call_pc = -1
 
 class CodeInjectionOracle(Oracle):
     def __init__(self):

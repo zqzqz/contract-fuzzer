@@ -10,7 +10,6 @@ import logging
 from random import randint, choice
 import json
 import os
-import time
 
 logger = logging.getLogger("Fuzzer")
 logger.setLevel(logging.INFO)
@@ -138,7 +137,6 @@ class Fuzzer():
         
         # if there is any call
         if sum(calls) > 0:
-            time.sleep(1)
             # revert all calls when executing transactions
             opts["revert"] = True
             for tx in txList:

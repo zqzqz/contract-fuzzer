@@ -22,7 +22,7 @@ class TraceAnalyzer:
         reward, jumps = self.path_variaty(ptraces, ctraces)
         reward *= FUZZ_CONFIG["path_variaty_reward"]
         seeds = self.get_seed_candidates(ctraces)
-        report = self.detector.run(ctraces)
+        report = list(set(self.detector.run(ctraces)))
         for rep in report:
             if isinstance(rep, Vulnerability):
                 reward += FUZZ_CONFIG["vulnerability_reward"]

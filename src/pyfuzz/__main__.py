@@ -151,6 +151,10 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                 state, seq_len = env.reset()
                 report_num = 0
                 while True:
+                    if opts["exploit"] and not opts["vulnerability"] and done:
+                        break
+                    if timeout:
+                        break
                     # test
                     # env.printTxList()
                     try:
@@ -178,12 +182,10 @@ def baseline(datadir, output, repeat_num, rand_prob, opts):
                         reward, done, timeout = 0, 0, 0
                     # print("reward", reward)
 
-                    if timeout:
-                        logger.info("contract {} finished with counter {}".format(
-                            filename, env.counter))
-                        report[filename][i]["coverage"] = env.coverage()
-                        report[filename][i]["attempt"] = env.counter
-                        break
+                logger.info("contract {} finished with counter {}".format(
+                    filename, env.counter))
+                report[filename][i]["coverage"] = env.coverage()
+                report[filename][i]["attempt"] = env.counter
 
             with open(output, "w") as f:
                 json.dump(report, f, indent=4)
