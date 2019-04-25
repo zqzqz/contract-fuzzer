@@ -325,7 +325,7 @@ class Fuzzer():
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, reward, done, timeout
         except Exception as e:
-            logger.exception("fuzzer.step: {}".format(str(e)))
+            logger.error("fuzzer.step: {}".format(str(e)))
             state, seqLen = self.stateProcessor.encodeState(self.state)
             return state, seqLen, 0, 0, 1
 
