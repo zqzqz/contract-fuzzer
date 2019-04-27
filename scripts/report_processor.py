@@ -14,12 +14,12 @@ def list_all_contracts(datapath):
 def select_success(filepath):
     with open(filepath, "r") as f:
         report = json.load(f)
-    total, select, BalanceIncrement, Selfdestruct, CodeInjection = 0, 0, 0, 0, 0
+    total, select, BalanceIncrement, Selfdestruct, CodeInjection, Reentrancy, TimestampDependency, BlockNumberDependency, UnhandledException = 0, 0, 0, 0, 0, 0, 0, 0, 0
 
     for filename in report:
         total += 1
-        if str(report[filename]).count("exploit") > 0:
-            print(filename)
+        if str(report[filename]).count("pc") > 0:
+            # print(filename)
             select += 1
             if str(report[filename]).count("BalanceIncrement") > 0:
                 BalanceIncrement += 1
@@ -27,7 +27,24 @@ def select_success(filepath):
                 Selfdestruct += 1
             if str(report[filename]).count("CodeInjection") > 0:
                 CodeInjection += 1
-    print(select, BalanceIncrement, Selfdestruct, CodeInjection, total)
+            if str(report[filename]).count("Reentrancy") > 0:
+                Reentrancy += 1
+            if str(report[filename]).count("TimestampDependency") > 0:
+                TimestampDependency += 1
+            if str(report[filename]).count("BlockNumberDependency") > 0:
+                BlockNumberDependency += 1
+            if str(report[filename]).count("UnhandledException") > 0:
+                UnhandledException += 1
+            print(filename)  
+    # print(select, BalanceIncrement, Selfdestruct, CodeInjection, total)
+
+def unique(filepath):
+    with open(filepath, "r") as f:
+        contracts = f.read().split("\n")
+    contracts = list(set(contracts))
+    contracts = "\n".join(contracts)
+    with open(filepath, "w") as f:
+        f.write(contracts)
 
 def compare_reports(filepath0, filepath1):
     with open(filepath0, "r") as f:
@@ -74,5 +91,6 @@ def compare_reports(filepath0, filepath1):
     print("total", a / total, b / total)
 
 # list_all_contracts("/home/zqz/teether_contract")
-select_success("report.model.exploit.json")
+# select_success("report.model.vulnerability.json")
 # compare_reports("report.model.exploit.json", "report.random.exploit.json")
+unique("vulnerability_list.txt")

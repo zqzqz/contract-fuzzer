@@ -107,7 +107,7 @@ def deep_q_learning(sess,
     print("Populating replay memory...")
     state, seq_len, filename = env.random_reset(datadir)
     for i in range(replay_memory_init_size):
-        action_probs = policy(
+        action_probs, q_values = policy(
             sess, state, epsilons[min(total_t, epsilon_decay_steps-1)], seq_len)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         next_state, next_seq_len, reward, done, timeout = env.step(action)
@@ -124,6 +124,9 @@ def deep_q_learning(sess,
     # todo
 
     for i_episode in range(num_episodes):
+
+        episode_reward = 0
+        episode_q = 0
 
         # Save the current checkpoint
         saver.save(tf.get_default_session(), checkpoint_path)
@@ -151,10 +154,13 @@ def deep_q_learning(sess,
             sys.stdout.flush()
 
             # Take a step
-            action_probs = policy(sess, state, epsilon, seq_len)
+            action_probs, q_values = policy(sess, state, epsilon, seq_len)
             action = np.random.choice(
                 np.arange(len(action_probs)), p=action_probs)
             next_state, next_seq_len, reward, done, timeout = env.step(action)
+
+            episode_reward += reward
+            episode_q += float(np.amax(q_values))
 
             # If our replay memory is full, pop the first element
             if len(replay_memory) == replay_memory_size:
@@ -192,19 +198,23 @@ def deep_q_learning(sess,
             seq_len = next_seq_len
             total_t += 1
 
+        episode_reward /= t
+        episode_q /= t
+        with open("train_plot.csv", "a") as f:
+            f.write("{}, {}\n".format(str(episode_reward), str(episode_q)))
         # Add summaries to tensorboard
-        episode_summary = tf.Summary()
-        episode_summary.value.add(simple_value=epsilon, tag="episode/epsilon")
+        # episode_summary = tf.Summary()
+        # episode_summary.value.add(simple_value=epsilon, tag="episode/epsilon")
         # episode_summary.value.add(
         #     simple_value=stats.episode_rewards[i_episode], tag="episode/reward")
         # episode_summary.value.add(
         #     simple_value=stats.episode_lengths[i_episode], tag="episode/length")
-        episode_summary.value.add(
-            simple_value=current_process.cpu_percent(), tag="system/cpu_usage_percent")
-        episode_summary.value.add(simple_value=current_process.memory_percent(
-            memtype="vms"), tag="system/v_memeory_usage_percent")
-        q_estimator.summary_writer.add_summary(episode_summary, i_episode)
-        q_estimator.summary_writer.flush()
+        # episode_summary.value.add(
+        #     simple_value=current_process.cpu_percent(), tag="system/cpu_usage_percent")
+        # episode_summary.value.add(simple_value=current_process.memory_percent(
+        #     memtype="vms"), tag="system/v_memeory_usage_percent")
+        # q_estimator.summary_writer.add_summary(episode_summary, i_episode)
+        # q_estimator.summary_writer.flush()
 
         # yield total_t, plotting.EpisodeStats(
         #     episode_lengths=stats.episode_lengths[:i_episode+1],
@@ -238,9 +248,9 @@ def train(datadir, episode_num=100, opts={}):
                         target_estimator=target_estimator,
                         experiment_dir=experiment_dir,
                         num_episodes=episode_num,
-                        replay_memory_size=50000,
-                        replay_memory_init_size=5000,
-                        update_target_estimator_every=5000,
+                        replay_memory_size=5000,
+                        replay_memory_init_size=500,
+                        update_target_estimator_every=500,
                         epsilon_start=1.0,
                         epsilon_end=0.4,
                         epsilon_decay_steps=500000,

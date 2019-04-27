@@ -55,7 +55,7 @@ class TimestampOpOracle(Oracle):
             if self.res_stat == 0:
                 self.res_stat += 1
             self.res_pcs.append(step["pc"])
-        if step["op"] in ["CALL", "CALLCODE", "DELEGATECALL"]:
+        if step["op"] in ["CALL"] and len(step["stack"]) >= 3 and int(step["stack"][-3], 16) > 0:
             if self.res_stat == 1:
                 self.res_stat = 0
                 for pc in self.res_pcs:
@@ -78,7 +78,7 @@ class BlockNumOpOracle(Oracle):
             if self.res_stat == 0:
                 self.res_stat += 1
             self.res_pcs.append(step["pc"])
-        if step["op"] in ["CALL", "CALLCODE", "DELEGATECALL"]:
+        if step["op"] in ["CALL"] and len(step["stack"]) >= 3 and int(step["stack"][-3], 16) > 0:
             if self.res_stat == 1:
                 self.res_stat = 0
                 for pc in self.res_pcs:
@@ -167,7 +167,7 @@ class ReentrancyOracle(Oracle):
             with open(json_file, "r") as f:
                 self.accounts = list(json.load(f))
         self.call_pc = -1
-        self.write_op_list = ["SSTORE", "JUMP", "JUMPI"]
+        self.write_op_list = ["SSTORE"]
     
     def run_step(self, step):
         if self.call_pc <= 0 and step["op"] == "CALL":

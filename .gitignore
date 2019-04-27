@@ -12,4 +12,6 @@ experiments*
 report.json
 /scripts/*.txt
 /scripts/*.json
+/src/*.json
+/src/*.csv
 *.tar.gz
