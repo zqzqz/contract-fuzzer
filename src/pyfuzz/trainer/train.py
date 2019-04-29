@@ -103,9 +103,17 @@ def deep_q_learning(sess,
         q_estimator,
         actionProcessor.actionNum)
 
+    # test
+    filenames = os.listdir(datadir)
+    filename_len = len(filenames)
+    counter = 0
+
     # Populate the replay memory with initial experience
     print("Populating replay memory...")
-    state, seq_len, filename = env.random_reset(datadir)
+    # state, seq_len, filename = env.random_reset(datadir)
+    filename = filenames[counter % filename_len]
+    state, seq_len = env.contract_reset(datadir, filename)
+    counter += 1
     for i in range(replay_memory_init_size):
         action_probs, q_values = policy(
             sess, state, epsilons[min(total_t, epsilon_decay_steps-1)], seq_len)
@@ -115,7 +123,10 @@ def deep_q_learning(sess,
             state, seq_len, action, reward, next_state, next_seq_len, filename, done))
         if timeout:
             # env.refreshEvm()
-            state, seq_len, filename = env.random_reset(datadir)
+            # state, seq_len, filename = env.random_reset(datadir)
+            filename = filenames[counter % filename_len]
+            state, seq_len = env.contract_reset(datadir, filename)
+            counter += 1
         else:
             state = next_state
             seq_len = next_seq_len
@@ -125,10 +136,6 @@ def deep_q_learning(sess,
 
     # Add env Monitor wrapper
     # todo
-
-    # test
-    filenames = os.listdir(datadir)
-    filename_len = len(filenames)
 
     for i_episode in range(num_episodes):
 

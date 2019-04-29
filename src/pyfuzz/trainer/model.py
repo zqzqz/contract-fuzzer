@@ -192,7 +192,7 @@ class Estimator():
             self.accuracy = tf.reduce_mean(
                 tf.cast(tf.equal(self.outputs, self.y), "float"))
 
-        self.optimizer = tf.train.AdamOptimizer(0.001)
+        self.optimizer = tf.train.AdamOptimizer(0.0001)
         self.train_op = self.optimizer.minimize(
             self.loss, global_step=tf.contrib.framework.get_global_step())
 

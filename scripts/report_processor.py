@@ -54,6 +54,7 @@ def compare_reports(filepath0, filepath1):
         report1 = json.load(f)
 
     total, a, b, success_total = 0, 0, 0, 0
+    attempt_dif_total = 0
     for filename in report0:
         try:
             success0, success1 = str(report0[filename]).count("exploit"), str(report1[filename]).count("exploit")
@@ -68,6 +69,8 @@ def compare_reports(filepath0, filepath1):
                 count0, count1 = 0, 0
                 for repeat in report0[filename]:
                     for report in report0[filename][repeat]["reports"]:
+                        if report["attempt"] > 350:
+                            continue
                         attempt0 += report["attempt"]
                         count0 += 1
                 for repeat in report1[filename]:
@@ -77,6 +80,7 @@ def compare_reports(filepath0, filepath1):
                 attempt0, attempt1 = attempt0 / count0, attempt1 / count1
 
             attempt_rate_dif = attempt0 - attempt1
+            attempt_dif_total += attempt_rate_dif
 
             if success_rate_dif == 0 and attempt_rate_dif == 0:
                 continue
@@ -85,12 +89,12 @@ def compare_reports(filepath0, filepath1):
                 a += 1
             if attempt_rate_dif < 0:
                 b += 1
-            print(filename, success_rate_dif, attempt_rate_def)
+            print(filename, success_rate_dif, attempt_rate_dif)
         except:
             pass
-    print("total", a / total, b / total)
+    print(total, a / total, b / total, attempt_dif_total)
 
 # list_all_contracts("/home/zqz/teether_contract")
 # select_success("report.model.vulnerability.json")
-# compare_reports("report.model.exploit.json", "report.random.exploit.json")
-unique("vulnerability_list.txt")
+compare_reports("test.report.model.exploit.json", "test.report.random.exploit.json")
+# unique("vulnerability_list.txt")
