@@ -119,9 +119,16 @@ def deep_q_learning(sess,
         else:
             state = next_state
             seq_len = next_seq_len
+    
+    # test
+    test_memory = replay_memory[:100]
 
     # Add env Monitor wrapper
     # todo
+
+    # test
+    filenames = os.listdir(datadir)
+    filename_len = len(filenames)
 
     for i_episode in range(num_episodes):
 
@@ -132,7 +139,8 @@ def deep_q_learning(sess,
         saver.save(tf.get_default_session(), checkpoint_path)
 
         # Reset the environment
-        state, seq_len, filename = env.random_reset(datadir)
+        # state, seq_len, filename = env.random_reset(datadir)
+        state, seq_len = env.contract_reset(datadir, filenames[i_episode % filename_len])
         loss = None
 
         # env.refreshEvm()
@@ -159,8 +167,8 @@ def deep_q_learning(sess,
                 np.arange(len(action_probs)), p=action_probs)
             next_state, next_seq_len, reward, done, timeout = env.step(action)
 
+            # test
             episode_reward += reward
-            episode_q += float(np.amax(q_values))
 
             # If our replay memory is full, pop the first element
             if len(replay_memory) == replay_memory_size:
@@ -190,6 +198,13 @@ def deep_q_learning(sess,
             seq_len_batch = np.array(seq_len_batch)
             loss = q_estimator.update(
                 sess, states_batch, action_batch, targets_batch, seq_len_batch)
+
+            # test
+            states_batch, seq_len_batch, action_batch, reward_batch, next_states_batch, next_seq_len_batch, contract_file_batch, done_batch = map(
+                np.array, zip(*test_memory))
+            q_values = target_estimator.predict(
+                sess, states_batch, seq_len_batch)
+            episode_q += float(np.amax(q_values))
 
             if timeout:
                 break
@@ -248,11 +263,11 @@ def train(datadir, episode_num=100, opts={}):
                         target_estimator=target_estimator,
                         experiment_dir=experiment_dir,
                         num_episodes=episode_num,
-                        replay_memory_size=5000,
-                        replay_memory_init_size=500,
-                        update_target_estimator_every=500,
+                        replay_memory_size=10000,
+                        replay_memory_init_size=2500,
+                        update_target_estimator_every=2500,
                         epsilon_start=1.0,
                         epsilon_end=0.4,
-                        epsilon_decay_steps=500000,
-                        discount_factor=0.5,
+                        epsilon_decay_steps=250000,
+                        discount_factor=0.6,
                         batch_size=32)
