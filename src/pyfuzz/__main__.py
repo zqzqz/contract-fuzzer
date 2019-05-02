@@ -68,6 +68,9 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
 
             if not env.loadContract(full_filename, contract_name):
                 continue
+
+            # if env.contract["opcodes"].count("CALL ") == 0:
+                # continue
             
             for i in range(repeat_num):
                 try:
@@ -82,12 +85,12 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
                         state, seq_len = env.reset()
                         report_num = 0
                         while True:
-                            if opts["exploit"] and not opts["vulnerability"] and done:
+                            # test
+                            # env.printTxList()
+                            if opts["exploit"] and done:
                                 break
                             if timeout:
                                 break
-                            # test
-                            # env.printTxList()
                             try:
                                 if rand_prob < 1.0:
                                     feed_dict = {X: np.expand_dims(

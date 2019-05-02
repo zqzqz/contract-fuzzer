@@ -11,32 +11,46 @@ def list_all_contracts(datapath):
             print("error", e, filename)
 
 
-def select_success(filepath):
+def select_success(filepath, name_map):
     with open(filepath, "r") as f:
         report = json.load(f)
-    total, select, BalanceIncrement, Selfdestruct, CodeInjection, Reentrancy, TimestampDependency, BlockNumberDependency, UnhandledException = 0, 0, 0, 0, 0, 0, 0, 0, 0
+    total, select = 0, 0 
+    BalanceIncrement, Selfdestruct, CodeInjection = 0, 0, 0 
+    Reentrancy, TimestampDependency, BlockNumberDependency, UnhandledException = 0, 0, 0, 0
 
+    name_visited = {}
     for filename in report:
         total += 1
+        # if str(report[filename]).count("exploit") > 0:
         if str(report[filename]).count("pc") > 0:
+            name = filename.split('#')[1].split('.')[0]
+            if name in name_visited:
+                continue
+            else:
+                name_visited[name] = 1
             # print(filename)
+            if name not in name_map:
+                weight = 1
+            else:
+                weight = 1 # name_map[name]
+
             select += 1
             if str(report[filename]).count("BalanceIncrement") > 0:
-                BalanceIncrement += 1
+                BalanceIncrement += weight
             if str(report[filename]).count("Selfdestruct") > 0:
-                Selfdestruct += 1
+                Selfdestruct += weight
             if str(report[filename]).count("CodeInjection") > 0:
-                CodeInjection += 1
+                CodeInjection += weight
             if str(report[filename]).count("Reentrancy") > 0:
-                Reentrancy += 1
+                Reentrancy += weight
             if str(report[filename]).count("TimestampDependency") > 0:
-                TimestampDependency += 1
+                TimestampDependency += weight
             if str(report[filename]).count("BlockNumberDependency") > 0:
-                BlockNumberDependency += 1
+                BlockNumberDependency += weight
             if str(report[filename]).count("UnhandledException") > 0:
-                UnhandledException += 1
-            print(filename)  
-    # print(select, BalanceIncrement, Selfdestruct, CodeInjection, total)
+                UnhandledException += weight
+    # print(select/total, BalanceIncrement, Selfdestruct, CodeInjection)
+    print(select/total, Reentrancy, TimestampDependency, BlockNumberDependency, UnhandledException)
 
 def unique(filepath):
     with open(filepath, "r") as f:
@@ -57,7 +71,7 @@ def compare_reports(filepath0, filepath1):
     attempt_dif_total = 0
     for filename in report0:
         try:
-            success0, success1 = str(report0[filename]).count("exploit"), str(report1[filename]).count("exploit")
+            success0, success1 = str(report0[filename]).count("pc"), str(report1[filename]).count("pc")
             if success0 or success1:
                 success_total += 1
             attempt0, attempt1 = 0, 0
@@ -94,7 +108,9 @@ def compare_reports(filepath0, filepath1):
             pass
     print(total, a / total, b / total, attempt_dif_total)
 
+with open("map.json", "r") as f:
+    name_map = json.load(f)
 # list_all_contracts("/home/zqz/teether_contract")
-# select_success("report.model.vulnerability.json")
-compare_reports("test.report.model.exploit.json", "test.report.random.exploit.json")
+select_success("report.model.vulnerability.json", name_map)
+# compare_reports("test.report.model.vulnerability.json", "test.report.random.vulnerability.json")
 # unique("vulnerability_list.txt")

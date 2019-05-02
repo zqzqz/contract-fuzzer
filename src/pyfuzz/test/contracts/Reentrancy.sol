@@ -9,6 +9,6 @@ contract Test{
 
     function Reentrancy() public {
         require(msg.sender.call.value(100)());
-        flag = false;
+        // flag = false;
     }
 }

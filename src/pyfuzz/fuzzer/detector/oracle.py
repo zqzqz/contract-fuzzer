@@ -107,7 +107,7 @@ class EtherTransferOracle(Oracle):
 
 class SendCallOracle(Oracle):
     def __init__(self):
-        super().__init__("EtherTransfer")
+        super().__init__("SendCall")
         self.accounts = []
         seed_dir = DIR_CONFIG["seed_dir"]
         json_file = os.path.join(seed_dir, "address.json")
@@ -126,7 +126,7 @@ class SendCallOracle(Oracle):
 
             address = stack[-2]
             input_len = stack[-5]
-            if int(input_len, 16) == 0 and address[-40:] in self.accounts and int(gas, 16) == 0:
+            if int(input_len, 16) == 0 and address[-40:] in self.accounts and (int(gas, 16) == 0 or int(gas, 16) == 2300):
                 self.results.append(OracleReport(self.name, 1, step["pc"]))
 
 
@@ -167,20 +167,20 @@ class ReentrancyOracle(Oracle):
             with open(json_file, "r") as f:
                 self.accounts = list(json.load(f))
         self.call_pc = -1
-        self.write_op_list = ["SSTORE"]
+        self.write_op_list = ["SSTORE", "CALL", "DELEGATECALL", "CALLCODE"]
     
     def run_step(self, step):
-        if self.call_pc <= 0 and step["op"] == "CALL":
+        if self.call_pc < 0 and step["op"] == "CALL":
             stack = step["stack"]
             gas = stack[-1]
             address = stack[-2]
             # is it necessary to have value > 0?
             value = stack[-3]
 
-            if int(gas, 16) != 0 and address[-40:] in self.accounts:
+            if int(gas, 16) != 0 and int(gas, 16) != 2300 and address[-40:] in self.accounts:
                 self.call_pc = step["pc"]
         
-        if self.call_pc > 0 and step["op"] in self.write_op_list:
+        elif self.call_pc > 0 and step["op"] in self.write_op_list:
             self.results.append(OracleReport(self.name, 1, self.call_pc))
             self.call_pc = -1
 

@@ -26,7 +26,7 @@ def test_vulnerability(name):
         print(str(vuln))
 
 if __name__ == "__main__":
-    test_vulnerability("TimestampDependency")
-    test_vulnerability("BlockNumberDependency")
-    test_vulnerability("UnhandledException")
+    # test_vulnerability("TimestampDependency")
+    # test_vulnerability("BlockNumberDependency")
+    # test_vulnerability("UnhandledException")
     test_vulnerability("Reentrancy")

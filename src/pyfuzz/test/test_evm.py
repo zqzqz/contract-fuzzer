@@ -5,6 +5,11 @@ from pyfuzz.fuzzer.interface import Transaction
 from pyfuzz.fuzzer.trace import TraceAnalyzer
 from pyfuzz.fuzzer.detector.detector import Detector
 import eth_abi
+import json
+
+def save_trace(filename, trace):
+    with open(filename, "w") as f:
+        json.dump(trace, f, indent=2)
 
 def test():
     evm = EvmHandler()
@@ -40,7 +45,7 @@ def test_compile(datadir):
 
 
 def test_vulnerability(datadir):
-    filename = "0x3e84512f277A5081B9209831C51bCe665035D9DB#TheGame.sol"
+    filename = "0x484d3830713aA61A0774795083D8CC7dFF6072D0#Olympus.sol"
     name = filename.split('.')[0].split('#')[1]
     filename = os.path.join(datadir, filename)
     evm = EvmHandler()
@@ -55,8 +60,8 @@ def test_vulnerability(datadir):
     account = list(accounts.keys())[0]
     balance = accounts[account]
     traces = []
-    trace = evm.sendTx(account, address, "0", contract["functionHashes"]["contribute_toTheGame()"], {"revert": True})
-    print("trace:", [t["op"] for t in trace])
+    trace = evm.sendTx(account, address, "1000", "", {"revert": True})
+    # save_trace("tmp_trace.json", trace)
     traces.append(trace)
     detector = Detector({"vulnerability": True})
     report = detector.run(traces)
@@ -86,7 +91,7 @@ def test_exploit(datadir):
     print("balance increment:", int(balance_1, 16) - int(balance, 16))
 
 if __name__ == "__main__":
-    # test()
+    test()
     # test_compile("/home/zqz/teether_contract")
-    test_exploit("/home/zqz/teether_contract")
+    # test_exploit("/home/zqz/teether_contract")
     # test_vulnerability("/home/zqz/contracts")

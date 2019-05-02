@@ -9,6 +9,7 @@ __pycache__
 pip-selfcheck.json
 experiments*
 *.pyc
+/scripts
 /scripts/*.txt
 /scripts/*.json
 /scripts/*.csv
