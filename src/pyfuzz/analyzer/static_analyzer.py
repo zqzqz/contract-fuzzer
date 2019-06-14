@@ -30,7 +30,7 @@ class AnalysisReport():
                 continue
             full_name = function.full_name
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
-            self.func_map[func_hash] = function.encode_id
+            self.func_map[func_hash] = function
 
     @property
     def report(self):

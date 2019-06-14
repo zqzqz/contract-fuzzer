@@ -189,11 +189,29 @@ class Fuzzer():
             funcHash = txHash
             if len(self.contractAbi.funcHashList) <= 0 or (len(self.contractAbi.funcHashList) == 1 and txHash in self.contractAbi.funcHashList):
                 return None
-            attempt = 100
-            while funcHash == txHash and attempt > 0:
-                funcHash = choice(self.contractAbi.funcHashList)
-                attempt -= 1
-            tx = self.contractAbi.generateTx(funcHash, self.defaultAccount)
+            candidateFunc = []
+            for funcHash in self.contractAbi.funcHashList:
+                if funcHash == txHash or not funcHash in self.contractAnalysisReport.func_map:
+                    continue
+                if self.contractAnalysisReport.func_map[funcHash].features["call"] > 0:
+                    candidateFunc.append(funcHash)
+                    continue
+                read_set = set()
+                write_set = set(self.contractAnalysisReport.func_map[funcHash]._vars_written)
+                for i in range(actionArg, TRAIN_CONFIG["max_call_num"]):
+                    if not isinstance(state.txList[i], Transaction):
+                        continue
+                    tmp_hash = state.txList[i].hash
+                    if tmp_hash in self.contractAnalysisReport.func_map:
+                        read_set = read_set.union(self.contractAnalysisReport.func_map[tmp_hash]._vars_read)
+                if len(read_set.intersection(write_set)) > 0:
+                    candidateFunc.append(funcHash)
+                    continue
+
+            if len(candidateFunc) == 0:
+                return None
+            selectedFuncHash = choice(candidateFunc)
+            tx = self.contractAbi.generateTx(selectedFuncHash, self.defaultAccount)
             txList[actionArg] = tx
         elif actionId == 1:
             # modify args

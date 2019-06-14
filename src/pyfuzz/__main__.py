@@ -86,7 +86,7 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
                         report_num = 0
                         while True:
                             # test
-                            # env.printTxList()
+                            env.printTxList()
                             if opts["exploit"] and done:
                                 break
                             if timeout:

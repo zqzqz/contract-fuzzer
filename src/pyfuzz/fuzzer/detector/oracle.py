@@ -56,7 +56,7 @@ class TimestampOpOracle(Oracle):
                 self.res_stat += 1
             self.res_pcs.append(step["pc"])
         if step["op"] in ["CALL"] and len(step["stack"]) >= 3 and int(step["stack"][-3], 16) > 0:
-            if self.res_stat == 1:
+            if self.res_stat > 0:
                 self.res_stat = 0
                 for pc in self.res_pcs:
                     self.results.append(OracleReport(self.name, 1, pc))
@@ -79,7 +79,7 @@ class BlockNumOpOracle(Oracle):
                 self.res_stat += 1
             self.res_pcs.append(step["pc"])
         if step["op"] in ["CALL"] and len(step["stack"]) >= 3 and int(step["stack"][-3], 16) > 0:
-            if self.res_stat == 1:
+            if self.res_stat > 0:
                 self.res_stat = 0
                 for pc in self.res_pcs:
                     self.results.append(OracleReport(self.name, 1, pc))
