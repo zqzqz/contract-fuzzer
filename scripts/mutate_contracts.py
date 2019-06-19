@@ -2,6 +2,7 @@ import os
 import logging
 from abc import abstractmethod
 import random
+import argparse
 
 from pyfuzz.fuzzer.fuzzer import Fuzzer
 from pyfuzz.trainer.model import *
@@ -250,18 +251,18 @@ class MutateController():
 
                 contract.process()
                 tmp_file = os.path.join(self.output_dir, "tmp"+filename)
-                target_file = os.path.join(self.output_dir, filename)
                 contract.show_mutations()
-                for source in contract.mutated_sources:
+                index = 0
+                for s in [source] + contract.mutated_sources:
                     try:
                         with open(tmp_file, "w") as f:
-                            f.write(source)
+                            f.write(s)
                         # try fuzz
                         if self.fuzz(tmp_file):
-                            with open(target_file, "w") as f:
-                                f.write(source)
-                            os.remove(tmp_file)
-                            break
+                            with open(os.path.join(self.output_dir, str(index) + "-" + filename), "w") as f:
+                                f.write(s)
+                                index += 1
+                        os.remove(tmp_file)
                     except Exception as e:
                         logging.error("mutation on " + filename + " failed", e)
 
@@ -302,5 +303,12 @@ class MutateController():
 
 
 if __name__ == "__main__":
-    controller = MutateController("/home/zqz/test/input", "/home/zqz/test/output")
+    parser = argparse.ArgumentParser(description='Contract fuzzer')
+    parser.add_argument("--input", type=str,
+                        help="input directory", default="input/")
+    parser.add_argument("--output", type=str,
+                        help="output directory", default="output/") 
+
+    args = parser.parse_args()
+    controller = MutateController(args.input, args.output)
     controller.start()
