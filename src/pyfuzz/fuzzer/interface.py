@@ -47,7 +47,7 @@ class ContractAbi:
         self.interface = {}
         self.funcHashList = []
         self.functionHashes = None
-        self.typeHandler = TypeHandler()
+        self.typeHandlers = {}
         self.visited = {}
         if contract != None:
             self.loadAbi(contract)
@@ -87,34 +87,48 @@ class ContractAbi:
             if sig != None:
                 self.interface[sig] = abi
                 self.visited[sig] = 0
+                self.typeHandlers[sig] = TypeHandler()
                 self.funcHashList.append(sig)
 
-    def generateTxArgs(self, hash):
+    def getSeeds(self, hashList):
+        res = TypeHandler().seeds
+        try:
+            for sig in hasList:
+                if sig not in self.typeHandlers:
+                    continue
+                for _type in self.typeHandlers[sig]:
+                    if _type not in res:
+                        continue
+                    res[_type] = list(set(res[_type] + self.typeHandlers[sig][_type]))
+            return res
+        except:
+            return res
+
+    def generateTxArgs(self, hash, seeds=None):
         assert(self.interface[hash] != None)
         args = []
         inputAbi = self.interface[hash]["inputs"]
         for abi in inputAbi:
-            data = self.typeHandler.fuzzByType(abi["type"], FUZZ_CONFIG["seed_prob"])
+            data = self.typeHandlers[hash].fuzzByType(abi["type"], FUZZ_CONFIG["seed_prob"], seeds)
             args.append(data)
         return args
 
-    def generateTxValue(self, hash):
+    def generateTxValue(self, hash, seeds=None):
         assert(self.interface[hash] != None)
         inputAbi = self.interface[hash]["inputs"]
         value = 0
         if self.interface[hash]['payable']:
-            value = self.typeHandler.fuzzByType("payment", FUZZ_CONFIG["seed_prob"])
+            value = self.typeHandlers[hash].fuzzByType("payment", FUZZ_CONFIG["seed_prob"], seeds)
         return value
 
     """
         Input: function hash
         Output: transaction
     """
-    def generateTx(self, hash, sender):
-        args = self.generateTxArgs(hash)
-        # value = self.generateTxValue(hash)
+    def generateTx(self, hash, sender, seeds=None):
+        args = self.generateTxArgs(hash, seeds)
         if self.interface[hash]['payable']:
-            value = 1000
+            value = self.generateTxValue(hash, seeds)
         else:
             value = 0
         return Transaction(hash, args, value, sender, self.interface[hash], self.visited[hash])

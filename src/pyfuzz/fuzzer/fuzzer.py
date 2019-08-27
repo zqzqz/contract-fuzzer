@@ -152,7 +152,7 @@ class Fuzzer():
         add arguments of a tx list to seeds
         """
         new_path_flag = False
-        seeds = self.contractAbi.typeHandler.seeds
+
         visitedPcList = self.contractMap[self.filename]["visited"]
         j = 0
         for i in range(len(txList)):
@@ -160,6 +160,12 @@ class Fuzzer():
                 continue
             if pcs[i].issubset(visitedPcList):
                 continue
+
+            logger.debug("find new path")
+            
+            # get Seeds
+            seeds = self.contractAbi.typeHandlers[txList[i].hash].seeds
+            
             new_path_flag = True
             self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[i])
             
@@ -172,6 +178,7 @@ class Fuzzer():
             for seed in more_seeds[i]:
                 if seed[0] in seeds:
                     seeds[seed[0]].append(seed[1])
+                    logger.debug("load seed", seed)
         return new_path_flag
 
     def mutate(self, state, action):
@@ -180,9 +187,28 @@ class Fuzzer():
         actionArg = action.actionArg
         txHash = None
         if actionArg < 0 or actionArg >= self.maxCallNum:
+            logger.error("wrong action")
             return None
         if txList[actionArg]:
             txHash = txList[actionArg].hash
+
+        # get Seeds
+        hashList = []
+        for tx in txList:
+            if not tx:
+                continue
+            hashList.append(tx.hash)
+        seeds = self.contractAbi.getSeeds(hashList)
+
+        # manual checks
+        # NOTE: only use manual checks without training
+        logger.debug("action", actionId, actionArg)
+        if not txList[-1]:
+            actionArg = len(txList) -1
+            actionId = 0
+        elif txHash == None:
+            actionId = 0
+        logger.debug("checked action", actionId, actionArg)
 
         # modify
         if actionId == 0:
@@ -198,7 +224,7 @@ class Fuzzer():
                     continue
                 read_set = set()
                 write_set = set(self.contractAnalysisReport.func_map[funcHash]._vars_written)
-                for i in range(actionArg, TRAIN_CONFIG["max_call_num"]):
+                for i in range(actionArg + 1, TRAIN_CONFIG["max_call_num"]):
                     if not isinstance(state.txList[i], Transaction):
                         continue
                     tmp_hash = state.txList[i].hash
@@ -211,13 +237,13 @@ class Fuzzer():
             if len(candidateFunc) == 0:
                 return None
             selectedFuncHash = choice(candidateFunc)
-            tx = self.contractAbi.generateTx(selectedFuncHash, self.defaultAccount)
+            tx = self.contractAbi.generateTx(selectedFuncHash, self.defaultAccount, seeds)
             txList[actionArg] = tx
         elif actionId == 1:
             # modify args
             if txHash == None:
                 return None
-            txList[actionArg].args = self.contractAbi.generateTxArgs(txHash)
+            txList[actionArg].args = self.contractAbi.generateTxArgs(txHash, seeds)
         elif actionId == 2:
             # modify sender
             if txHash == None:
@@ -239,7 +265,7 @@ class Fuzzer():
             value = state.txList[actionArg].value
             attempt = 100
             while value == state.txList[actionArg].value and attempt > 0:
-                value = self.contractAbi.generateTxValue(txHash)
+                value = self.contractAbi.generateTxValue(txHash, seeds)
                 attempt -= 1
             txList[actionArg].value = value
         else:

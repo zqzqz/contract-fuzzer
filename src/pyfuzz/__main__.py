@@ -56,7 +56,7 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
         contract_files = os.listdir(datadir)
         for filename in contract_files:
             # env.refreshEvm()
-            logger.info(filename)
+            logger.info("start fuzzing {}".format(filename))
             full_filename = os.path.join(datadir, filename)
             contract_name = filename.split('.')[0].split("#")[-1]
             # print("filename", filename)
@@ -69,8 +69,9 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
             if not env.loadContract(full_filename, contract_name):
                 continue
 
-            # if env.contract["opcodes"].count("CALL ") == 0:
-                # continue
+            # contracts without calls do not worth exploit generation
+            if env.contract["opcodes"].count("CALL ") == 0:
+                continue
             
             for i in range(repeat_num):
                 try:
@@ -85,13 +86,11 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
                         state, seq_len = env.reset()
                         report_num = 0
                         while True:
-                            # test
-                            env.printTxList()
-                            if opts["exploit"] and done:
-                                break
                             if timeout:
                                 break
                             try:
+                                # test
+                                # env.printTxList()
                                 if rand_prob < 1.0:
                                     feed_dict = {X: np.expand_dims(
                                         state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
@@ -110,6 +109,11 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
                                     # logger.info("Found:", repr(env.report[r]))
                                     report[filename][i]["reports"].append({"report": repr(env.report[r]), "attempt": env.counter})
                                 report_num = len(env.report)
+
+                                if "exploit" in opts and opts["exploit"] == True and report_num > 0:
+                                    logger.info("exploit found")
+                                    env.printTxList()
+                                    break
 
                             except Exception as e:
                                 if isinstance(e, Timeout.Timeout):

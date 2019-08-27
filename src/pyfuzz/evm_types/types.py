@@ -54,7 +54,7 @@ class TypeHandler():
         for _type in list(self.type_list.keys()):
             if type_list[_type]["type"] == "array":
                 continue
-            json_file = os.path.join(_seed_dir, _type+".json")
+            json_file = os.path.join(_seed_dir, _type + ".json")
             if os.path.isfile(json_file):
                 with open(json_file, "r") as f:
                     self.seeds[_type] = list(json.load(f))
@@ -119,7 +119,7 @@ class TypeHandler():
         slen = size // 8
         return ''.join(random.sample(string.printable, slen))
 
-    def generateValueByType(self, _type, mode="random"):
+    def generateValueByType(self, _type, seeds, mode="random"):
         type_obj = self.type_list[_type]
         if type_obj == None:
             logger.error("EVM type {} not found ".format(_type))
@@ -130,7 +130,7 @@ class TypeHandler():
         
         # seed mode
         if (mode == "seed" or _type == "address") and type_obj["type"] != "array":
-            type_seeds = self.seeds[_type]
+            type_seeds = seeds[_type]
             if type_seeds == None or len(type_seeds) == 0:
                 # generate random value if seeds are unavailable
                 mode = "random"
@@ -233,10 +233,13 @@ class TypeHandler():
             logger.error("EVM type not found " + _type)
             return None
 
-    def fuzzByType(self, _type, seed_prob):
+    def fuzzByType(self, _type, seed_prob, seeds):
         assert(seed_prob >= 0 and seed_prob <= 1)
+        if seeds == None:
+            seeds = self.seeds
+
         rand_prob = random.random()
         if rand_prob < seed_prob:
-            return self.generateValueByType(_type, mode="seed")
+            return self.generateValueByType(_type, seeds, mode="seed")
         else:
-            return self.generateValueByType(_type, mode="random")
+            return self.generateValueByType(_type, seeds, mode="random")
