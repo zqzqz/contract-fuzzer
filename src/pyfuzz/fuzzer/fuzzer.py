@@ -80,7 +80,7 @@ class Fuzzer():
             return True
         else:
             try:
-                with open(filename, "r") as f:
+                with open(filename, "r",encoding="utf-8") as f:
                     source = f.read()
                 self.contract = self.evm.compile(source, contract_name)
                 contractAddress = self.evm.deploy(self.contract)
@@ -348,8 +348,8 @@ class Fuzzer():
                 bal_p = 0
                 bal = 0
                 for acc in self.accounts.keys():
-                    bal_p += int(FUZZ_CONFIG["account_balance"], 16)
-                    bal += int(self.accounts[acc], 16)
+                    bal_p += int(str(FUZZ_CONFIG["account_balance"]), 16)
+                    bal += int(str(self.accounts[acc]), 16)
 
                 if bal > bal_p:
                     reward += FUZZ_CONFIG["exploit_reward"]
