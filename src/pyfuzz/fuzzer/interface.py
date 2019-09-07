@@ -43,12 +43,13 @@ class Transaction:
 
 class ContractAbi:
 
-    def __init__(self, contract=None):
+    def __init__(self, contract, accounts):
         self.interface = {}
         self.funcHashList = []
         self.functionHashes = None
         self.typeHandlers = {}
         self.visited = {}
+        self.accounts = accounts
         if contract != None:
             self.loadAbi(contract)
 
@@ -89,6 +90,12 @@ class ContractAbi:
                 self.visited[sig] = 0
                 self.typeHandlers[sig] = TypeHandler()
                 self.funcHashList.append(sig)
+
+    def shiftHashList(self):
+        assert(self.funcHashList == None or len(self.funcHashList) == 0)
+        tmpHash = self.funcHashList[0]
+        self.funcHashList.remove(tmpHash)
+        self.funcHashList.append(tmpHash)
 
     def getSeeds(self, hashList):
         res = TypeHandler().seeds

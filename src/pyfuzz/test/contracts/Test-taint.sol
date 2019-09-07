@@ -28,9 +28,10 @@ contract Test {
 	uint tmp;
 	uint i=c;
 	uint j;
-	if (i>5) {
+	if (c>5) {
 	    tmp = a;
 	    num1 = tmp;
+		num2 = a;
 	}
 	else {
 	    tmp = b;

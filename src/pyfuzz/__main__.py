@@ -1,7 +1,5 @@
 from pyfuzz.fuzzer.fuzzer import Fuzzer
-from pyfuzz.trainer.model import *
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
-from pyfuzz.trainer.train import train
 from pyfuzz.utils.utils import experimentDirectory
 from pyfuzz.utils.timeout import Timeout
 from pyfuzz.fuzzer.detector.exploit import Exploit
@@ -24,115 +22,74 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
     # initialize fuzzer framework
     env = Fuzzer(evmEndPoint=None, opts=opts)
 
-    # Create estimators
-    actionProcessor = ActionProcessor()
-    stateProcessor = StateProcessor()
-    # q_estimator = Estimator(scope="q_estimator", summaries_dir=experiment_dir, action_num=actionProcessor.actionNum)
-    # target_estimator = Estimator(scope="target_q")
-
-    if rand_prob < 1.0:
-        # Create directories for checkpoints and summaries
-        checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
-        checkpoint_path = os.path.join(checkpoint_dir, "model.meta")
-
     report = {}
     if os.path.isfile(output):
         with open(output, "r") as f:
             report = json.load(f)
 
-    with tf.Session() as sess:
-        if rand_prob < 1.0:
-            # First let's load meta graph and restore weights
-            saver = tf.train.import_meta_graph(checkpoint_path)
-            saver.restore(sess, tf.train.latest_checkpoint(checkpoint_dir))
+    contract_files = os.listdir(datadir)
+    for filename in contract_files:
+        logger.info("start fuzzing {}".format(filename))
+        full_filename = os.path.join(datadir, filename)
+        contract_name = filename.split('.')[0].split("#")[-1]
 
-            graph = tf.get_default_graph()
-            predictions = graph.get_tensor_by_name(
-                "target_q/CNN/predictions:0")
-            X = graph.get_tensor_by_name("target_q/X:0")
-            real_seq_length = graph.get_tensor_by_name(
-                "target_q/real_seq_length:0")
+        if filename not in report:
+            report[filename] = {}
+        else:
+            continue
 
-        contract_files = os.listdir(datadir)
-        for filename in contract_files:
-            # env.refreshEvm()
-            logger.info("start fuzzing {}".format(filename))
-            full_filename = os.path.join(datadir, filename)
-            contract_name = filename.split('.')[0].split("#")[-1]
-            # print("filename", filename)
+        if not env.loadContract(full_filename, contract_name):
+            continue
 
-            if filename not in report:
-                report[filename] = {}
-            else:
-                continue
+        # contracts without calls do not worth exploit generation
+        if env.contract["opcodes"].count("CALL ") == 0:
+            continue
+        
+        for i in range(repeat_num):
+            try:
+                with Timeout(set_timeout):
+                    report[filename][i] = {
+                        "reports": [],
+                        "coverage": 0,
+                        "attempt": 0
+                    }
+                    timeout = 0
+                    done = 0
+                    state = env.reset()
+                    report_num = 0
+                    while True:
+                        if timeout:
+                            break
+                        try:
+                            state, done, timeout = env.step(action)
 
-            if not env.loadContract(full_filename, contract_name):
-                continue
+                            for r in range(report_num, len(env.report)):
+                                # logger.info("Found:", repr(env.report[r]))
+                                report[filename][i]["reports"].append({"report": repr(env.report[r]), "attempt": env.counter})
+                            report_num = len(env.report)
 
-            # contracts without calls do not worth exploit generation
-            if env.contract["opcodes"].count("CALL ") == 0:
-                continue
-            
-            for i in range(repeat_num):
-                try:
-                    with Timeout(set_timeout):
-                        report[filename][i] = {
-                            "reports": [],
-                            "coverage": 0,
-                            "attempt": 0
-                        }
-                        timeout = 0
-                        done = 0
-                        state, seq_len = env.reset()
-                        report_num = 0
-                        while True:
-                            if timeout:
+                            if "exploit" in opts and opts["exploit"] == True and report_num > 0:
+                                logger.info("exploit found")
+                                env.printTxList()
                                 break
-                            try:
-                                # test
-                                # env.printTxList()
-                                if rand_prob < 1.0:
-                                    feed_dict = {X: np.expand_dims(
-                                        state, 0), real_seq_length: np.expand_dims(seq_len, 0)}
-                                    q_values = sess.run(predictions, feed_dict)[0]
-                                    action_probs = np.ones(
-                                        actionProcessor.actionNum, dtype=float) * rand_prob / actionProcessor.actionNum
-                                    best_action = np.argmax(q_values)
-                                    action_probs[best_action] += (1.0 - rand_prob)
-                                    action = np.random.choice(
-                                        np.arange(len(action_probs)), p=action_probs)
-                                else:
-                                    action = random.randint(0, TRAIN_CONFIG["action_num"]-1)
-                                state, seq_len, reward, done, timeout = env.step(action)
 
-                                for r in range(report_num, len(env.report)):
-                                    # logger.info("Found:", repr(env.report[r]))
-                                    report[filename][i]["reports"].append({"report": repr(env.report[r]), "attempt": env.counter})
-                                report_num = len(env.report)
+                        except Exception as e:
+                            if isinstance(e, Timeout.Timeout):
+                                logger.error("Time is out for contract {} at test {}".format(filename, repeat_num))
+                            logger.error("__main__.baseline: {}".format(str(e)))
+                            done, timeout = 0, 0, 0
+                            break
+            except:
+                pass
 
-                                if "exploit" in opts and opts["exploit"] == True and report_num > 0:
-                                    logger.info("exploit found")
-                                    env.printTxList()
-                                    break
+            logger.info("contract {} finished with counter {}".format(
+                filename, env.counter))
+            report[filename][i]["coverage"] = env.coverage()
+            report[filename][i]["attempt"] = env.counter
 
-                            except Exception as e:
-                                if isinstance(e, Timeout.Timeout):
-                                    logger.error("Time is out for contract {} at test {}".format(filename, repeat_num))
-                                logger.error("__main__.baseline: {}".format(str(e)))
-                                reward, done, timeout = 0, 0, 0
-                                break
-                            # print("reward", reward)
-                except:
-                    pass
-
-                logger.info("contract {} finished with counter {}".format(
-                    filename, env.counter))
-                report[filename][i]["coverage"] = env.coverage()
-                report[filename][i]["attempt"] = env.counter
-
-            with open(output, "w") as f:
-                json.dump(report, f, indent=4)
-                logger.info("Result written")
+        with open(output, "w") as f:
+            json.dump(report, f, indent=4)
+            logger.info("Result written")
 
 
 def main():

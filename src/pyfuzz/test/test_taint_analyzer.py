@@ -7,8 +7,7 @@ def test():
     filename = os.path.join(os.path.dirname(__file__), '../test/contracts/Test-taint.sol')
     # test DFSparse by Test-parse.sol; test process by Test-taint.sol
     static_analyzer = StaticAnalyzer(filename, "Test")
-    static_analyzer.pre_taint()
-    static_analyzer.taint_analysis()
+    static_analyzer.run()
     for con in static_analyzer.contracts:
         for fun in con.functions:
             print(fun._name)
@@ -28,9 +27,6 @@ def test():
                 for v in fun.conditionList[mark]:
                     list.append(v.name)
                 print(list)
-
-            static_analyzer._parse_function_for_report(fun)
-
 
 if __name__ == "__main__":
     test()
