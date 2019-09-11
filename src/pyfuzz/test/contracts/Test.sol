@@ -7,8 +7,8 @@ contract Test {
 
     function test1(uint a) public payable {
         emit TestEvent(a);
-        // payments[msg.sender] += a;
-        // owner = msg.sender;
+        payments[msg.sender] += a;
+        owner = msg.sender;
     }
 
     function test2() public {

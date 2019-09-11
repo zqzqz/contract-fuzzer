@@ -1,5 +1,4 @@
 from pyfuzz.analyzer.ir_analyzer import Visitor, IrAnalyzer
-from pyfuzz.config import ANALYSIS_CONFIG
 import eth_utils
 from types import MethodType
 import slither
@@ -28,6 +27,9 @@ class AnalysisReport():
             func_hash = eth_utils.keccak(text=full_name).hex()[:8]
             self.func_map[func_hash] = function
 
+    def get_function(self, func_hash):
+        return self.func_map[func_hash]
+
     def get_taint_list(self, func_hash):
         if funcHash not in self.func_map:
             return []
@@ -41,10 +43,13 @@ class AnalysisReport():
             return self.func_map[func_hash].conditionList
 
     def get_feature(self, func_hash):
-        if funcHash not in self.func_map:
+        if func_hash not in self.func_map:
             return []
         else:
-            return self.func_map[func_hash].feature
+            return self.func_map[func_hash].features
+
+    def is_function_critical(self, func_hash):
+        return self.get_feature(func_hash)["call"] > 0
 
 
 class StaticAnalyzer(IrAnalyzer):
@@ -54,8 +59,8 @@ class StaticAnalyzer(IrAnalyzer):
         self.solidity_var_map = {"msg.sender": 1, "msg.value": 2}
         self.report = None
 
-    def extract_feature(self, contract):
-        for function in contract.functions:
+    def extract_feature(self):
+        for function in self.contract.functions:
             function.features = {
                 "call": len(function._external_calls_as_expressions),
                 "msg": 0,
@@ -389,13 +394,13 @@ class StaticAnalyzer(IrAnalyzer):
             return an AnalysisReport object, the report has the format:
             function full name (key) => a list of numbers
         """
-        self.extract_feature()
-        self.pre_taint()
-        self.taint_analysis()
-
         # select main contract
         contract=self.contract
         assert(contract != None)
+
+        self.extract_feature()
+        self.pre_taint()
+        self.taint_analysis()
 
         report=self._simplify_contract_report(contract)
         if debug:

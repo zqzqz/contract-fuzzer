@@ -5,7 +5,7 @@ from pyfuzz.config import FUZZ_CONFIG
 
 
 class Transaction:
-    def __init__(self, hash, args, value, sender, abi, total_visited=0, tmp_visited=0):
+    def __init__(self, hash="", args=[], value=0, sender="", abi=[], total_visited=0, tmp_visited=0):
         self.hash = hash
         self.args = args
         self.value = value
@@ -50,6 +50,7 @@ class ContractAbi:
         self.typeHandlers = {}
         self.visited = {}
         self.accounts = accounts
+        self.defaultAccount = accounts[0]
         if contract != None:
             self.loadAbi(contract)
 
@@ -100,7 +101,7 @@ class ContractAbi:
     def getSeeds(self, hashList):
         res = TypeHandler().seeds
         try:
-            for sig in hasList:
+            for sig in hashList:
                 if sig not in self.typeHandlers:
                     continue
                 for _type in self.typeHandlers[sig]:
@@ -110,6 +111,11 @@ class ContractAbi:
             return res
         except:
             return res
+
+    def clearSeeds(self):
+        res = TypeHandler().seeds
+        for sig in self.funchashList:
+            self.typeHandlers[sig] = res
 
     def generateTxArgs(self, hash, seeds=None):
         assert(self.interface[hash] != None)
@@ -138,6 +144,8 @@ class ContractAbi:
             value = self.generateTxValue(hash, seeds)
         else:
             value = 0
+        if sender == None:
+            sender = self.defaultAccount
         return Transaction(hash, args, value, sender, self.interface[hash], self.visited[hash])
 
     def updateVisited(self, funcHash):

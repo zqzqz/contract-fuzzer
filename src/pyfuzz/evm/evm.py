@@ -30,7 +30,7 @@ class EvmHandler():
             return json.loads(ret)
         else:
             logger.error("Correct response not received from rpc server (getAccounts)")
-            return None
+            raise Exception("cannot fetch accounts")
 
     def compile(self, text, name):
         source = pyfuzz.evm.evm_pb2.Source(text=text, name=name)
@@ -39,9 +39,11 @@ class EvmHandler():
             return json.loads(ret.data)
         else:
             logger.error("Correct response not received from rpc server (compile)")
-            return None
+            raise Exception("cannot compile contract")
 
     def deploy(self, contract):
+        if not contract:
+            raise Exception("cannot deploy none contract")
         new_contract = {}
         if "bytecode" in contract:
             new_contract["bytecode"] = contract["bytecode"]
@@ -51,7 +53,8 @@ class EvmHandler():
         ret = None
         for i in self.stub.Deploy(contractRpc):
             ret = i.address
-            break
+        if ret == None:
+            raise Exception("cannot deploy contract")
         return ret
 
     def sendTx(self, fromAddr, toAddr, value, data, opts={}):
@@ -67,4 +70,4 @@ class EvmHandler():
             return json.loads(ret)
         else:
             logger.error("Correct response not received from rpc server (sendTx)")
-            return None
+            raise Exception("cannot send transaction")

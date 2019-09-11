@@ -123,10 +123,10 @@ class TypeHandler():
         type_obj = self.type_list[_type]
         if type_obj == None:
             logger.error("EVM type {} not found ".format(_type))
-            return None
+            raise Exception("generator type error")
         if mode not in self.mode_list:
             logger.error("Incorrect mode for generateValueByType.")
-            return None
+            raise Exception("generator type error")
         
         # seed mode
         if (mode == "seed" or _type == "address") and type_obj["type"] != "array":
@@ -149,7 +149,7 @@ class TypeHandler():
                 selected_uint = self.generateRandomIntValue(num_size)
             else:
                 logger.error("Incorrect mode for generateValueByType.")
-                return None
+                raise Exception("generator type error")
             return selected_uint
         
         elif type_obj["type"] == "int":
@@ -165,14 +165,14 @@ class TypeHandler():
                     selected_int = -selected_int
             else:
                 logger.error("Incorrect mode for generateValueByType.")
-                return None
+                raise Exception("generator type error")
             return selected_int
         
         elif type_obj["type"] == "address":
             # 'address' generation only support 'seed' mode
             logger.error(
                 "Only seed mode is acceptable for address generation.")
-            return None
+            raise Exception("generator type error")
         
         elif type_obj["type"] == "bool":
             bool_prob = random.random()
@@ -191,7 +191,7 @@ class TypeHandler():
                 selected_hex = self.generateRandomHexValue(num_size)
             else:
                 logger.error("Incorrect mode for generateValueByType.")
-                return None
+                raise Exception("generator type error")
             return bytearray.fromhex(selected_hex)
 
         elif type_obj["type"] == "bytes":
@@ -206,7 +206,7 @@ class TypeHandler():
                 selected_hex = self.generateRandomHexValue(num_size)
             else:
                 logger.error("Incorrect mode for generateValueByType.")
-                return None
+                raise Exception("generator type error")
             return bytearray.fromhex(selected_hex)
 
         elif type_obj["type"] == "string":
@@ -219,7 +219,7 @@ class TypeHandler():
                 selected_str = self.generateRandomString(num_size)
             else:
                 logger.error("Incorrect mode for generateValueByType.")
-                return None
+                raise Exception("generator type error")
             return selected_str
 
         elif type_obj["type"] == "array":
@@ -231,7 +231,7 @@ class TypeHandler():
 
         else:
             logger.error("EVM type not found " + _type)
-            return None
+            raise Exception("generator type error")
 
     def fuzzByType(self, _type, seed_prob, seeds):
         assert(seed_prob >= 0 and seed_prob <= 1)

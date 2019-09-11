@@ -1,9 +1,9 @@
 from pyfuzz.evm.evm import EvmHandler
 from pyfuzz.fuzzer.interface import ContractAbi, Transaction
-from pyfuzz.fuzzer.action import Action, actionProcessor
+from pyfuzz.fuzzer.action import Action, ActionProcessor
 from pyfuzz.fuzzer.state import State, StateProcessor
 from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
-from pyfuzz.fuzzer.mutate import MutationProcessor
+from pyfuzz.fuzzer.mutation import MutationProcessor
 from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
 from pyfuzz.fuzzer.detector.exploit import Exploit
 from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
@@ -42,7 +42,6 @@ class Fuzzer():
         self.state = None
         self.seqLen = None
         # configurations
-        self.maxFuncNum = TRAIN_CONFIG["max_func_num"]
         self.maxCallNum = TRAIN_CONFIG["max_call_num"]
         self.actionNum = TRAIN_CONFIG["action_num"]
         # execution results
@@ -84,9 +83,13 @@ class Fuzzer():
                 with open(filename, "r",encoding="utf-8") as f:
                     source = f.read()
                 self.contract = self.evm.compile(source, contract_name)
+                
+                # the address is not used
+                # test the deployment
                 contractAddress = self.evm.deploy(self.contract)
                 if not contractAddress:
                     return False
+                
                 self.contractAbi = ContractAbi(self.contract, list(self.accounts.keys()))
                 # run static analysis
                 self.staticAnalyzer.load_contract(filename, contract_name)
@@ -106,10 +109,15 @@ class Fuzzer():
                 logger.exception("fuzz.loadContract: {}".format(str(e)))
                 return False
 
+    def getContract(self, filename):
+        if filename not in self.contractMap:
+            raise Exception("filename not found")
+        return self.contractMap[filename]
+
     def runOneTx(self, tx, opts={}):
         if self.contract == None:
             logger.exception("Contract have not been loaded.")
-            return None
+            raise Exception("fuzzer error")
         trace = self.evm.sendTx(tx.sender, self.contractAddress,
                                 str(tx.value), tx.payload, opts)
         if not trace:
@@ -191,7 +199,7 @@ class Fuzzer():
         self.counter = 0
         if not self.contract:
             logger.exception("Contract not inintialized in fuzzer.")
-            return None, None
+            raise Exception("fuzzer error")
         self.contractAddress = self.evm.deploy(self.contract)
 
         self.state = self.mutationProcessor.init()
@@ -225,7 +233,7 @@ class Fuzzer():
         if self.loadContract(full_filename, contract_name):
             return self.reset()
         else:
-            return None
+            raise Exception("fuzzer error")
 
     def step(self):
         done = 0
