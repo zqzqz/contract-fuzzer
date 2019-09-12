@@ -10,13 +10,18 @@ from random import random
 logger = logging.getLogger("Fuzzer")
 logger.setLevel(logging.INFO)
 
-class MutationProcessor:
+class InputGenerator:
 
     def __init__(self, contractAbi, contractAnalysisReport):
+        # external
         self.contractAbi = contractAbi
         self.contractAnalysisReport = contractAnalysisReport
         self.criticalFuncHashList = []
+        
+        # const
+        self.stage_capacity = 50
 
+        # dynamic
         # help select functions by weight
         self.func_history = {}
         self.func_history_delta = {}
@@ -24,18 +29,36 @@ class MutationProcessor:
             self.func_history[funcHash] = [0,0] # [interesting cases number, none interesting]
             self.func_history_delta[funcHash] = [0,0]
         self.s = 0
+        self.counter = 0
+        self.state = None
 
-    def init_state(self):
-        return State(self._gen_txs())
-
-    def mutate(self, state):
-        # action selection
-        action = 0
-        # mutation
-        return mutate_with_action(0)
+    def generate(self):
+        assert(self.s == 0)
+        self.s = 1
+        self.state = State(self._gen_txs())
 
     def feedback(self, score):
-        pass
+        assert(self.s == 1 and self.state != None)
+        self.s = 0
+        self.counter += 1
+        
+        for tx in self.state.txList:
+            if tx == None:
+                continue
+            if score:
+                self.func_history_delta[tx.hash][0] += 1
+            else:
+                self.func_history_delta[tx.hash][1] += 1
+        
+        if self.counter >= self.stage_capacity:
+            self.clear_stage()
+
+    def clear_stage(self):
+        self.counter = 0
+        for funcHash in self.contractAbi.funcHashList:
+            self.func_history[funcHash][0] += self.func_history_delta[funcHash][0]
+            self.func_history[funcHash][1] += self.func_history_delta[funcHash][1]
+            self.func_history_delta[funcHash] = [0, 0]
 
     def _check_tx(self, txList, index):
         # the requirements of a transaction in sequence
@@ -58,6 +81,8 @@ class MutationProcessor:
                 read_set = read_set.union(f._vars_read)
             return (len(read_set.intersection(write_set)) > 0)
 
+    def _func_weight(self, funcHash):
+        return self.func_history[funcHash][0]/((self.func_history[funcHash][0] + self.func_history[funcHash][1]) or 1) + 0.2
 
     def _random_select_tx(self, hashList):
         assert(len(hashList) > 0)
@@ -66,7 +91,7 @@ class MutationProcessor:
         for funcHash in hashList:
             if funcHash not in self.func_history:
                 raise Exception("wrong func hash")
-            score = score + self.func_history[funcHash][0]/((self.func_history[funcHash][0] + self.func_history[funcHash][1]) or 1) + 0.2
+            score = score + self._func_weight(funcHash)
             thres.append(score)
         pin = random() * thres[-1]
         for i in range(len(thres)):
@@ -103,60 +128,3 @@ class MutationProcessor:
             tx = self.contractAbi.generateTx(selectedHash, None, seeds)
             txList[i] = tx
         return txList
-
-    def _mutate_with_action(self, state, action):
-        txList = state.txList + []
-        actionId = action.actionId
-        actionArg = action.actionArg
-        txHash = None
-        # NOTE: actionId=0 is disabled
-        if actionArg <= 0 or actionArg >= self.maxCallNum:
-            logger.error("wrong action")
-            return None
-        if txList[actionArg]:
-            txHash = txList[actionArg].hash
-
-        # get Seeds
-        hashList = []
-        for tx in txList:
-            if not tx:
-                continue
-            hashList.append(tx.hash)
-        seeds = self.contractAbi.getSeeds(hashList)
-
-        # modify
-        if actionId == 0:
-            # disable 0
-            pass
-        elif actionId == 1:
-            # modify args
-            if txHash == None:
-                return None
-            txList[actionArg].args = self.contractAbi.generateTxArgs(txHash, seeds)
-        elif actionId == 2:
-            # modify sender
-            if txHash == None:
-                return None
-            sender = state.txList[actionArg].sender
-            attempt = 100
-            while sender == state.txList[actionArg].sender and attempt > 0:
-                randIndex = randint(0, len(self.accounts.keys())-1)
-                sender = list(self.accounts.keys())[randIndex]
-                attempt -= 1
-            txList[actionArg].sender = sender
-        elif actionId == 3:
-            # modify value
-            if txHash == None:
-                return None
-            if not self.contractAbi.interface[txHash]['payable']:
-                # not payable function
-                return None
-            value = state.txList[actionArg].value
-            attempt = 100
-            while value == state.txList[actionArg].value and attempt > 0:
-                value = self.contractAbi.generateTxValue(txHash, seeds)
-                attempt -= 1
-            txList[actionArg].value = value
-        else:
-            return None
-        return State(txList)

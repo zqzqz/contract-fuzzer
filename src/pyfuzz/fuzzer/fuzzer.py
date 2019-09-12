@@ -1,12 +1,11 @@
 from pyfuzz.evm.evm import EvmHandler
 from pyfuzz.fuzzer.interface import ContractAbi, Transaction
-from pyfuzz.fuzzer.action import Action, ActionProcessor
-from pyfuzz.fuzzer.state import State, StateProcessor
+from pyfuzz.fuzzer.state import State
 from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
-from pyfuzz.fuzzer.mutation import MutationProcessor
+from pyfuzz.fuzzer.generator import inputGenerator
 from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
 from pyfuzz.fuzzer.detector.exploit import Exploit
-from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
+from pyfuzz.config import FUZZ_CONFIG
 
 import logging
 from random import randint, choice
@@ -35,16 +34,12 @@ class Fuzzer():
         self.contract = None
         self.contractAbi = None
         self.contractAnalysisReport = None
+        self.inputGenerator = None
         # contract cache. Each element is a dict {"name", "contract", "abi", "report", "visited"}
         self.contractMap = {}
         self.contractAddress = None
-        # current state
-        self.state = None
-        self.seqLen = None
-        # configurations
-        self.maxCallNum = TRAIN_CONFIG["max_call_num"]
-        self.actionNum = TRAIN_CONFIG["action_num"]
         # execution results
+        self.state = State([])
         self.traces = []
         self.report = []
         # eth accounts
@@ -76,7 +71,7 @@ class Fuzzer():
             self.contractAbi = self.contractMap[filename]["abi"]
             self.contractAnalysisReport = self.contractMap[filename]["report"]
             # for mutation schedualing
-            self.mutationProcessor = MutationProcessor(self.contractAbi, self.contractAnalysisReport)
+            self.inputGenerator = inputGenerator(self.contractAbi, self.contractAnalysisReport)
             return True
         else:
             try:
@@ -95,7 +90,7 @@ class Fuzzer():
                 self.staticAnalyzer.load_contract(filename, contract_name)
                 self.contractAnalysisReport = self.staticAnalyzer.run()
                 # for mutation schedualing
-                self.mutationProcessor = MutationProcessor(self.contractAbi, self.contractAnalysisReport)
+                self.inputGenerator = inputGenerator(self.contractAbi, self.contractAnalysisReport)
                 # set cache
                 self.contractMap[filename] = {
                     "name": contract_name,
@@ -202,7 +197,7 @@ class Fuzzer():
             raise Exception("fuzzer error")
         self.contractAddress = self.evm.deploy(self.contract)
 
-        self.state = self.mutationProcessor.init()
+        self.state = self.inputGenerator.init()
         self.traces = []
         self.report = []
         return self.state
@@ -244,20 +239,15 @@ class Fuzzer():
             # testing
             if self.counter >= FUZZ_CONFIG["max_attempt"]:
                 timeout = 1
-            nextState = self.mutationProcessor.mutate(self.state)
-            if not nextState:
-                self.mutationProcessor.feedback(reward)
-                return self.state, done, timeout
+            self.state = self.inputGenerator.generate()
             # execute transactions
-            traces = self.runTxs(nextState.txList)
-            # get reward of executions
+            traces = self.runTxs(self.state.txList)
+            # get reports of executions
             reward, report, pcs, seeds = self.traceAnalyzer.run(self.traces, traces)
             self.traces = traces
-            # bonus for valid mutation
-            reward += FUZZ_CONFIG["valid_mutation_reward"]
             # update seeds
-            if self.loadSeed(nextState.txList, pcs, seeds):
-                reward += FUZZ_CONFIG["path_discovery_reward"]
+            if self.loadSeed(self.state.txList, pcs, seeds):
+                logger.debug("new path discovered")
             # check whether exploitation happens
             if self.opts["exploit"]:
                 self.accounts = self.evm.getAccounts()
@@ -269,37 +259,27 @@ class Fuzzer():
                     bal += int(str(self.accounts[acc]), 16)
 
                 if bal > bal_p:
-                    reward += FUZZ_CONFIG["exploit_reward"]
-                    report.append(Exploit("BalanceIncrement", nextState.txList))
+                    report.append(Exploit("BalanceIncrement", self.state.txList))
             # fill in transasactions for exploitation
             for rep in report:
                 if isinstance(rep, Exploit):
-                    rep.txList = nextState.txList
+                    rep.txList = self.state.txList
             # testing
             if len(report) > 0:
                 done = 1
             # update
-            self.state = nextState
             self.traces = traces
             # should exclude repeated reports
             self.report = list(set(self.report + report))
-            self.mutationProcessor.feedback(reward)
+            self.inputGenerator.feedback(reward)
             return self.state, done, timeout
         except Exception as e:
             logger.error("fuzzer.step: {}".format(str(e)))
             return self.state, 0, 1
 
     def coverage(self):
-        jump_cnt = 0
-        try:
-            jump_cnt = self.contract["opcodes"].count("JUMP")
-        except:
-            pass
-
-        if jump_cnt == 0:
-            return 1
-        else:
-            return len(self.contractMap[self.filename]["visited"]) / jump_cnt
+        # disabled
+        return 0
 
     def printTxList(self):
         print("TX LIST:")

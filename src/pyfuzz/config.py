@@ -1,14 +1,8 @@
 import os
 
-TRAIN_CONFIG = {
-    "max_call_num": 3
-}
-
-TRAIN_CONFIG["action_num"] = TRAIN_CONFIG["max_call_num"] * 4
-
 FUZZ_CONFIG = {
+    "max_call_num": 3,
     "seed_prob": 0.4,
-    "random_action_prob": 0.4,
     "account_balance": "0xffffffffffffffffffffffffffffffff",
     "max_attempt": 100
 }

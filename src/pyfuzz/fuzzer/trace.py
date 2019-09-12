@@ -9,6 +9,7 @@ call_op = ["CALL", "CALLCODE", "DELEGATECALL", "SELFDESTRUCT"]
 class TraceAnalyzer:
     def __init__(self, opts={}):
         self.detector = Detector(opts)
+        self.critical_pc_name = ["CALL", "CALLCODE", "SELFDESTRUCT", "DELEGATECALL", "MLOAD"]
 
     """
         input:
@@ -16,19 +17,14 @@ class TraceAnalyzer:
           ctraces (list(trace)): traces of current execution
         return
           report (list(string)): found vulnerabilities
-          reward (int): calculated reward
     """
     def run(self, ptraces, ctraces):
-        reward, jumps = self.path_variaty(ptraces, ctraces)
-        reward *= FUZZ_CONFIG["path_variaty_reward"]
+        p_pcs = self.get_pcs(ptraces)
+        c_pcs = self.get_pcs(ctraces)
+        reward = self.path_variaty(p_pcs, c_pcs)
         seeds = self.get_seed_candidates(ctraces)
         report = list(set(self.detector.run(ctraces)))
-        for rep in report:
-            if isinstance(rep, Vulnerability):
-                reward += FUZZ_CONFIG["vulnerability_reward"]
-            elif isinstance(rep, Exploit):
-                reward += FUZZ_CONFIG["exploit_reward"]
-        return reward, report, jumps, seeds
+        return reward, report, c_pcs, seeds
 
     def get_seed_candidates(self, ctraces):
         seeds = []
@@ -50,30 +46,16 @@ class TraceAnalyzer:
             trace_id += 1
         return seeds
 
-    def path_variaty(self, ptraces, ctraces):
-        pJumps = []
-        cJumps = []
-        ret_jumps = []
-        for ptrace in ptraces:
-            for state in ptrace:
-                if state["op"] in branch_op:
-                    pJumps.append(state["pc"])
-        for ctrace in ctraces:
-            tmp_jumps = []
-            for state in ctrace:
-                if state["op"] in branch_op:
-                    tmp_jumps.append(state["pc"])
-                    cJumps.append(state["pc"])
-            ret_jumps.append(set(tmp_jumps))
+    def get_pcs(self, ctraces):
+        # TODO
+        pcs = []
+        for t in ctraces:
+            if c["op"] in self.critical_pc_name:
+                pcs.append(c["pc"])
+        return set(pcs)
 
-        pJumps = list(set(pJumps))
-        cJumps = list(set(cJumps))
-        difJumps = list(set(pJumps + cJumps))
-        # print(difJumps, pJumps, cJumps)
-        if len(difJumps) == 0:
-            reward = 0
+    def path_variaty(self, p_pcs, c_pcs):
+        if len(c_pcs - p_pcs) > 0:
+            return 1
         else:
-            comJumpNum = len(pJumps) + len(cJumps) - len(difJumps)
-            reward = (len(pJumps) + len(cJumps) -
-                      2 * comJumpNum) / len(difJumps)
-        return reward, ret_jumps
+            return 0
