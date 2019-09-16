@@ -79,8 +79,12 @@ async function sendTxWrapper(call) {
     else revertCallFlag = true
     let res = await evmHandler.sendTx(call.request.fromAddr, call.request.toAddr, call.request.value, call.request.data, revertCallFlag);
     let trace = await evmHandler.debug(res.tx);
+    let state = await evmHandler.queryState();
     call.write({
-      data: JSON.stringify(trace)
+      data: JSON.stringify({
+        "trace": trace,
+        "state": state
+      })
     });
     call.end();
   } catch (err) {

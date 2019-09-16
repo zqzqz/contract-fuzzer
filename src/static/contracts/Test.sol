@@ -1,8 +1,12 @@
 pragma solidity ^0.4.24;
 
 contract Test {
-    address owner;
-    mapping(address => uint) payments;
+    address public owner;
+    mapping(address => uint) public payments;
+
+    constructor() public {
+        owner = msg.sender;
+    }
 
     function test1(uint a) public {
         owner = msg.sender;

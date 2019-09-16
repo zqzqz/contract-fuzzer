@@ -174,10 +174,9 @@ EVMHandler = {
           else {
             result.address = EVMHandler.defaultContractAddress;
           }
-          // EVMHandler.contracts[result.address] = contract;
           // init balance for newly deployed contracts
           let address = Buffer.from(result.address.replace("0x", ""), "hex")
-          // let address = result.address.replace("0x", "")
+          EVMHandler.contracts[result.address] = { "interface": contract.interface }
           let account = EVMHandler.stateTrie.get(address, (err, accData) => {
             let account = new Account(accData);
             // let rand_len = Math.floor(Math.random() * 24 + 8)
@@ -198,6 +197,34 @@ EVMHandler = {
       EVMHandler.debugger.debug(txhash);
       resolve(EVMHandler.debugger.traceManager.trace)
     });
+  },
+
+  queryState: (to) => {
+    return new Promise((resolve, reject) => {
+      abi = JSON.parse(EVMHandler.contracts[to].interface)
+      state = []
+      async.eachSeries(abi, (f, next) => {
+        console.log(f["name"])
+        try {
+          if (f["constant"] == true && f["inputs"].length == 0) {
+            EVMHandler.sendFormatTx(EVMHandler.defaultAccount, to, 0, f["name"], []).then((result) => {
+              state.push({
+                "name": f["name"],
+                "type": f["outputs"][0]["type"],
+                "value": result.tx.returnValue
+              })
+              next();
+            })
+          } else {
+            next();
+          }
+        } catch (e) {
+          next()
+        }
+      }, (err) => {
+        resolve(state);
+      })
+    })
   },
 
   // send a raw transaction
@@ -237,7 +264,11 @@ EVMHandler = {
             reject(err);
           } else {
             if (result == null || result === undefined) reject(null)
-            else { result.tx = evmTx; resolve(result); }
+            else { 
+              result.tx = evmTx;
+              result.tx.returnValue = utileth.bufferToHex(result.vm.runState.returnValue);
+              resolve(result);
+            }
           }
         })
       })

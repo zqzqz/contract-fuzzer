@@ -22,9 +22,8 @@ class TraceAnalyzer:
         p_pcs = self.get_pcs(ptraces)
         c_pcs = self.get_pcs(ctraces)
         reward = self.path_variaty(p_pcs, c_pcs)
-        seeds = self.get_seed_candidates(ctraces)
         report = list(set(self.detector.run(ctraces)))
-        return reward, report, c_pcs, seeds
+        return reward, report, c_pcs
 
     def get_seed_candidates(self, ctraces):
         seeds = []

@@ -113,42 +113,59 @@ class Fuzzer():
         if self.contract == None:
             logger.exception("Contract have not been loaded.")
             raise Exception("fuzzer error")
-        trace = self.evm.sendTx(tx.sender, self.contractAddress,
+        result = self.evm.sendTx(tx.sender, self.contractAddress,
                                 str(tx.value), tx.payload, opts)
-        if not trace:
-            trace = []
-        return trace
+        if not result:
+            raise Exception("no result from sendTx")
+        return result["trace"], result["state"]
 
-    def runTxs(self, txList):
-        self.contractAddress = self.evm.deploy(self.contract)
+    def runTxs(self):
         traces = []
         opts = {}
         calls = []
+        state = []
+        seeds = TypeHandler().seeds
 
-        for tx in txList:
+        for i in range(len(self.state.txList)):
+            self.inputGenerator.fill(i, state, seeds)
+            self.state = self.inputGenerator.state
+            tx = self.state.txList[i]
             if not tx:
                 calls.append(0)
                 traces.append([])
                 continue
-            if tx.hash in self.contractAnalysisReport.encoded_report:
-                calls.append(self.contractAnalysisReport.encoded_report[tx.hash]["features"][0])
+            
+            features = self.contractAnalysisReport.get_feature(tx.hash)
+            if len(features) > 0:
+                calls.append(self.contractAnalysisReport.get_feature(tx.hash)["call"])
             else:
                 calls.append(0)
             tx.updateVisited()
             self.contractMap[self.filename]["abi"].updateVisited(tx.hash)
-            trace = self.runOneTx(tx, opts)
+
+            state, trace = self.runOneTx(tx, opts)
+            new_seeds = self.traceAnalyzer.get_seed_candidates([trace])
+            for s in new_seeds:
+                if seed[0] in seeds:
+                    seeds[seed[0]].append(seed[1])
+
             if not trace:
                 trace = []
             traces.append(trace)
         
         # if there is any call
         if sum(calls) > 0:
+            state = []
+            seeds = TypeHandler().seeds
             # revert all calls when executing transactions
             opts["revert"] = True
-            for tx in txList:
+            for i in range(len(self.state.txList)):
+                self.inputGenerator.fill(i, state, seeds)
+                self.state = self.inputGenerator.state
+                tx = self.state.txList[i]
                 if not tx:
                     continue
-                trace = self.runOneTx(tx, opts)
+                state, trace = self.runOneTx(tx, opts)
                 if trace:
                     traces.append(trace)
         return traces
@@ -241,12 +258,12 @@ class Fuzzer():
                 timeout = 1
             self.state = self.inputGenerator.generate()
             # execute transactions
-            traces = self.runTxs(self.state.txList)
+            traces = self.runTxs()
             # get reports of executions
-            reward, report, pcs, seeds = self.traceAnalyzer.run(self.traces, traces)
+            reward, report, pcs = self.traceAnalyzer.run(self.traces, traces)
             self.traces = traces
             # update seeds
-            if self.loadSeed(self.state.txList, pcs, seeds):
+            if self.loadSeed(self.state.txList, pcs, []):
                 logger.debug("new path discovered")
             # check whether exploitation happens
             if self.opts["exploit"]:

@@ -35,7 +35,10 @@ class InputGenerator:
     def generate(self):
         assert(self.s == 0)
         self.s = 1
-        self.state = State(self._gen_txs())
+        self.state = State(self._gen_blank_txs())
+
+    def fill(self, index, state, seeds):
+        pass
 
     def feedback(self, score):
         assert(self.s == 1 and self.state != None)
@@ -99,15 +102,8 @@ class InputGenerator:
                 return hashList[i]
         raise Exception("something wrong")
 
-    def _gen_txs(self):
+    def _gen_blank_txs(self):
         txList = [None for i in range(TRAIN_CONFIG["max_call_num"])]
-        # get Seeds
-        hashList = []
-        for tx in txList:
-            if not tx:
-                continue
-            hashList.append(tx.hash)
-        seeds = self.contractAbi.getSeeds(hashList)
 
         if len(self.contractAbi.funcHashList) <= 0:
             raise Exception("wrong abi: no available functions to select")
@@ -125,6 +121,6 @@ class InputGenerator:
                     txList[i] = None
                 return txList
             selectedHash = self._random_select_tx(candidates)
-            tx = self.contractAbi.generateTx(selectedHash, None, seeds)
+            tx = self.contractAbi.generateTx(selectedHash, None, None)
             txList[i] = tx
         return txList

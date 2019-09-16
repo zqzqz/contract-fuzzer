@@ -138,6 +138,7 @@ class StaticAnalyzer(IrAnalyzer):
                 function.taintList = {}  # key:mark; value:[v1,v2...]
                 function.conditionList = {} # key:mark; value:[v1,v2..sink]
                 function.branch_taint = {}  # key:_node_id; value:[v1,v2..nodo._vars_read]
+                function.conditions = {} # key:_node_id; value:{"cond": [state_vars], "deps": [inputs]}
                 function.current_br_taint = []
                 function.setSource = MethodType(setSource, function)
                 function.setSink = MethodType(setSink, function)
@@ -214,6 +215,10 @@ class StaticAnalyzer(IrAnalyzer):
                 copy_taint(node.fathers[0],node)
                 # add corresponding br_mark of IF
                 function.current_br_taint.append(function.branch_taint[node.node_id])
+                function.conditions[node._node_id] = {
+                    "cond": [],
+                    "deps": []
+                }
                 return
 
 
