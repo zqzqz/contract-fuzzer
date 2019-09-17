@@ -1,7 +1,7 @@
 from pyfuzz.analyzer.ir_analyzer import Visitor, IrAnalyzer
 import eth_utils
 from types import MethodType
-import slither
+from slither.core.expressions import *
 
 def print_reports(reports):
     if isinstance(reports, list):
@@ -30,21 +30,44 @@ class AnalysisReport():
     def get_function(self, func_hash):
         return self.func_map[func_hash]
 
-    def get_taint_list(self, func_hash):
+    def get_dependency(self, func_hash):
         if funcHash not in self.func_map:
-            return []
+            raise Exception("function not exist in analysis")
+        else:
+            res = {}
+            for v in self.func_map[func_hash].taintList:
+                if v in res:
+                    res[v] = list(set(res[v] + self.func_map[func_hash].taintList[v]))
+                else:
+                    res[v] = self.func_map[func_hash].taintList[v]))
+            for v in self.func_map[func_hash].conditionList:
+                if v in res:
+                    res[v] = list(set(res[v] + self.func_map[func_hash].conditionList[v]))
+                else:
+                    res[v] = self.func_map[func_hash].conditionList[v]))
+            return res
+
+    def get_data_dependency(self, func_hash):
+        if funcHash not in self.func_map:
+            raise Exception("function not exist in analysis")
         else:
             return self.func_map[func_hash].taintList
 
-    def get_condition_list(self, func_hash):
+    def get_control_dependency(self, func_hash):
         if funcHash not in self.func_map:
-            return []
+            raise Exception("function not exist in analysis")
         else:
             return self.func_map[func_hash].conditionList
 
+    def get_conditions(self, func_hash):
+        if funcHash not in self.func_map:
+            raise Exception("function not exist in analysis")
+        else:
+            return self.func_map[func_hash].conditions
+
     def get_feature(self, func_hash):
         if func_hash not in self.func_map:
-            return []
+            raise Exception("function not exist in analysis")
         else:
             return self.func_map[func_hash].features
 
@@ -216,7 +239,8 @@ class StaticAnalyzer(IrAnalyzer):
                 # add corresponding br_mark of IF
                 function.current_br_taint.append(function.branch_taint[node.node_id])
                 function.conditions[node._node_id] = {
-                    "cond": [],
+                    "states": [],
+                    "consts": [],
                     "deps": []
                 }
                 return
@@ -348,6 +372,17 @@ class StaticAnalyzer(IrAnalyzer):
                 node._condition[mark] = node._vars_written
 
 
+        def search_const_in_condition(expression):
+            consts = []
+            if isinstance(expression, BinaryOperation):
+                consts.extend(search_const_in_condition(expression.expression_left))
+                consts.extend(search_const_in_condition(expression.expression_right))
+            elif isinstance(expression, Literal):
+                consts.append(expression.value)
+            else:
+                pass
+            return consts
+
         # main part of taint_analysis
         for contract in self.contracts:
             for function in contract.functions:
@@ -357,6 +392,7 @@ class StaticAnalyzer(IrAnalyzer):
                 # Parse the dataflow and do taint analysis
                 DFSparse(function,startNode)
                 # Combine conditions of nodes into conditionList of function
+                para_vars = [p_var for p_var in function._parameters if p_var != None]
                 condition_all_in_one = {}
                 for node in function.nodes:
                     for mark in node._condition:
@@ -366,9 +402,22 @@ class StaticAnalyzer(IrAnalyzer):
                             for var in node._condition[mark]:
                                 if not(var in condition_all_in_one[mark]):
                                     condition_all_in_one[mark].append(var)
+
+                    #extract condition information
+                    if node._node_id in function.conditions:
+                        for s in node._state_vars_read:
+                            if s not in node._tainted or len(node._tainted[s]) == 0:
+                                if s not in function.conditions[node._node_id]["states"]:
+                                    function.conditions[node._node_id]["states"].append(s)
+                        for v in node._vars_read:
+                            if v not in node._tainted:
+                                continue
+                            for s in node._tainted[v]:
+                                if s in para_vars and s not in function.conditions[node._node_id]:
+                                    function.conditions[node._node_id]["deps"].append(s)
+                        function.conditions[node._node_id]["consts"].extend(search_const_in_condition(node.expression))
                                     
                 # Sort by source type and drop duplicate values which have been written into taintList with same key
-                para_vars = [p_var for p_var in function._parameters if p_var != None]
                 for mark in function._solidity_vars_read:
                     if mark in condition_all_in_one:
                         function.conditionList[mark]=[]

@@ -135,6 +135,10 @@ class TypeHandler():
                 # generate random value if seeds are unavailable
                 mode = "random"
             else:
+                # allocate the default account with larger probability
+                if _type == "address":
+                    if random.random() < 0.5:
+                        return type_seeds[0]
                 rand_index = random.randint(0, len(type_seeds)-1)
                 return type_seeds[rand_index]
         

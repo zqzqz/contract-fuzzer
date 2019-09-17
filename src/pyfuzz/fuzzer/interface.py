@@ -117,35 +117,39 @@ class ContractAbi:
         for sig in self.funchashList:
             self.typeHandlers[sig] = res
 
-    def generateTxArgs(self, hash, seeds=None):
+    def generateTxArgs(self, hash, seeds):
         assert(self.interface[hash] != None)
         args = []
         inputAbi = self.interface[hash]["inputs"]
-        for abi in inputAbi:
-            data = self.typeHandlers[hash].fuzzByType(abi["type"], FUZZ_CONFIG["seed_prob"], seeds)
+        assert(len(inputAbi) == len(seeds))
+        for i in range(len(inputAbi)):
+            data = self.typeHandlers[hash].fuzzByType(inputAbi[i]["type"], FUZZ_CONFIG["seed_prob"], seeds[i])
             args.append(data)
         return args
 
-    def generateTxValue(self, hash, seeds=None):
+    def generateTxValue(self, hash, seeds):
         assert(self.interface[hash] != None)
-        inputAbi = self.interface[hash]["inputs"]
         value = 0
         if self.interface[hash]['payable']:
             value = self.typeHandlers[hash].fuzzByType("payment", FUZZ_CONFIG["seed_prob"], seeds)
         return value
 
+    def generateTxSender(self, hash, seeds):
+        assert(self.interface[hash] != None)
+        sender = self.typeHandlers[hash].fuzzByType("address", FUZZ_CONFIG["seed_prob"], seeds)
+        return sender
+
     """
         Input: function hash
         Output: transaction
     """
-    def generateTx(self, hash, sender, seeds=None):
-        args = self.generateTxArgs(hash, seeds)
-        if self.interface[hash]['payable']:
-            value = self.generateTxValue(hash, seeds)
-        else:
-            value = 0
-        if sender == None:
-            sender = self.defaultAccount
+    def generateTx(self, hash, seeds):
+        if seeds == None:
+            seeds = [TypeHandler().seeds for i in range(len(self.interface[hash]["inputs"]) + 2)]
+        assert(len(seeds) >= 2)
+        args = self.generateTxArgs(hash, seeds[:-2])
+        value = self.generateTxValue(hash, seeds[-2])
+        sender = self.generateTxSender(hash, seeds[-1])
         return Transaction(hash, args, value, sender, self.interface[hash], self.visited[hash])
 
     def updateVisited(self, funcHash):

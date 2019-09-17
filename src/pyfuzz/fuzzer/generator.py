@@ -121,6 +121,6 @@ class InputGenerator:
                     txList[i] = None
                 return txList
             selectedHash = self._random_select_tx(candidates)
-            tx = self.contractAbi.generateTx(selectedHash, None, None)
+            tx = self.contractAbi.generateTx(selectedHash, None)
             txList[i] = tx
         return txList

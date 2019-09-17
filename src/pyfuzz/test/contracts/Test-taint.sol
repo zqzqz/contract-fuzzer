@@ -15,7 +15,7 @@ contract Test {
 	for (uint i=0; i<4; i++){
 	    d=a+b;
             e=c;
-            if (b>2) {
+            if (b>num1) {
 		f=e+a;
 		owner = msg.sender;
 	    }
