@@ -2,10 +2,10 @@ from pyfuzz.evm.evm import EvmHandler
 from pyfuzz.fuzzer.interface import ContractAbi, Transaction
 from pyfuzz.fuzzer.state import State
 from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
-from pyfuzz.fuzzer.generator import inputGenerator
+from pyfuzz.fuzzer.generator import InputGenerator
 from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
 from pyfuzz.fuzzer.detector.exploit import Exploit
-from pyfuzz.config import FUZZ_CONFIG
+from pyfuzz.config import FUZZ_CONFIG, DIR_CONFIG
 
 import logging
 from random import randint, choice
@@ -90,7 +90,7 @@ class Fuzzer():
                 self.staticAnalyzer.load_contract(filename, contract_name)
                 self.contractAnalysisReport = self.staticAnalyzer.run()
                 # for mutation schedualing
-                self.inputGenerator = inputGenerator(self.contractAbi, self.contractAnalysisReport)
+                self.inputGenerator = InputGenerator(self.contractAbi, self.contractAnalysisReport)
                 # set cache
                 self.contractMap[filename] = {
                     "name": contract_name,
@@ -214,7 +214,7 @@ class Fuzzer():
             raise Exception("fuzzer error")
         self.contractAddress = self.evm.deploy(self.contract)
 
-        self.state = self.inputGenerator.init()
+        self.state = None
         self.traces = []
         self.report = []
         return self.state
@@ -291,7 +291,8 @@ class Fuzzer():
             self.inputGenerator.feedback(reward)
             return self.state, done, timeout
         except Exception as e:
-            logger.error("fuzzer.step: {}".format(str(e)))
+            import traceback
+            logger.error("fuzzer.step: {} {}".format(str(e), traceback.format_exc()))
             return self.state, 0, 1
 
     def coverage(self):

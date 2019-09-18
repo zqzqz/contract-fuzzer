@@ -16,8 +16,10 @@ class Transaction:
 
     @property
     def payload(self):
-        abi_array = self.inputTypes
-        payload = self.hash + eth_abi.encode_abi(abi_array, self.args).hex()
+        payload = ""
+        if len(self.args) > 0:
+            abi_array = self.inputTypes
+            payload = self.hash + eth_abi.encode_abi(abi_array, self.args).hex()
         return payload
 
     @property

@@ -31,43 +31,56 @@ class AnalysisReport():
         return self.func_map[func_hash]
 
     def get_dependency(self, func_hash):
-        if funcHash not in self.func_map:
-            raise Exception("function not exist in analysis")
+        if func_hash not in self.func_map:
+            raise Exception("AnalysisReport.get_dependency: function not exist in analysis")
         else:
-            res = {}
             for v in self.func_map[func_hash].taintList:
                 if v in res:
                     res[v] = list(set(res[v] + self.func_map[func_hash].taintList[v]))
                 else:
-                    res[v] = self.func_map[func_hash].taintList[v]))
+                    res[v] = self.func_map[func_hash].taintList[v]
             for v in self.func_map[func_hash].conditionList:
                 if v in res:
                     res[v] = list(set(res[v] + self.func_map[func_hash].conditionList[v]))
                 else:
-                    res[v] = self.func_map[func_hash].conditionList[v]))
+                    res[v] = self.func_map[func_hash].conditionList[v]
             return res
 
     def get_data_dependency(self, func_hash):
-        if funcHash not in self.func_map:
-            raise Exception("function not exist in analysis")
+        if func_hash not in self.func_map:
+            raise Exception("AnalysisReport: function not exist in analysis")
+        elif func_hash == "":
+            return {}
         else:
             return self.func_map[func_hash].taintList
 
     def get_control_dependency(self, func_hash):
-        if funcHash not in self.func_map:
-            raise Exception("function not exist in analysis")
+        if func_hash not in self.func_map:
+            raise Exception("AnalysisReport: function not exist in analysis")
+        elif func_hash == "":
+            return {}
         else:
             return self.func_map[func_hash].conditionList
 
     def get_conditions(self, func_hash):
-        if funcHash not in self.func_map:
-            raise Exception("function not exist in analysis")
+        if func_hash not in self.func_map:
+            raise Exception("AnalysisReport: function not exist in analysis")
+        elif func_hash == "":
+            return {}
         else:
             return self.func_map[func_hash].conditions
 
     def get_feature(self, func_hash):
         if func_hash not in self.func_map:
-            raise Exception("function not exist in analysis")
+            raise Exception("AnalysisReport: function not exist in analysis")
+        elif func_hash == "":
+            return {
+                "call": 0,
+                "msg": 0,
+                "block": 0,
+                "args": 0,
+                "payable": 0
+            }
         else:
             return self.func_map[func_hash].features
 

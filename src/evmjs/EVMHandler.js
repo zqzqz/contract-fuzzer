@@ -202,17 +202,17 @@ EVMHandler = {
   queryState: (to) => {
     return new Promise((resolve, reject) => {
       abi = JSON.parse(EVMHandler.contracts[to].interface)
-      state = []
+      state = {}
       async.eachSeries(abi, (f, next) => {
         console.log(f["name"])
         try {
           if (f["constant"] == true && f["inputs"].length == 0) {
             EVMHandler.sendFormatTx(EVMHandler.defaultAccount, to, 0, f["name"], []).then((result) => {
-              state.push({
+              state[f["name"]] = {
                 "name": f["name"],
                 "type": f["outputs"][0]["type"],
                 "value": result.tx.returnValue
-              })
+              }
               next();
             })
           } else {

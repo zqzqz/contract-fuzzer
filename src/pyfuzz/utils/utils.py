@@ -104,9 +104,6 @@ def removeHexPrefix(hexStr):
     return hexStr.replace("0x", "")
 
 
-def isHexString(hexStr):
-    return isinstance(hexStr, str) and re.match("^(0x)?[0-9a-fA-F]*$", hexStr)
-
 def hex256ToHex32(hexStr):
     assert(isHexString(hexStr))
     if len(hexStr) >= 6:
@@ -162,3 +159,6 @@ def experimentDirectory(base_dir, opts):
     for value in values:
         label = label * 2 + int(value)
     return base_dir + str(label)
+
+
+            

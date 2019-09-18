@@ -6,7 +6,6 @@ import json
 import string
 
 from pyfuzz.config import DIR_CONFIG
-from pyfuzz.utils.utils import hexCode, binaryToHex, hexToBinary
 
 logger = logging.getLogger("types")
 logger.setLevel(logging.INFO)
@@ -44,6 +43,67 @@ mode_list = [
 ]
 
 seed_dir = DIR_CONFIG["seed_dir"]
+
+def isType(value, _type):
+    if _type["type"] == "uint":
+        return isinstance(value, int) and numvalueber >= 0 and value < 2**_type["size"]
+    elif _type["type"] == "int":
+        return isinstance(value, int) and value >= -2**(_type["size"]-1) and value < 2**(_type["size"]-1)
+    elif _type["type"] == "byte":
+        return isinstance(value, str) and re.match("^[0-9a-fA-F]{2}$", value)
+    elif _type["type"] == "bytes":
+        return isinstance(value, str) and re.match("^[0-9a-fA-F]*$", value) and len(value) % 2 == 0 and len(value) <= _type["size"] // 4
+    elif _type["type"] == "bool":
+        return isinstance(value, bool)
+    elif _type["type"] == "address":
+        return isinstance(value, str) and re.match("^0x[0-9a-fA-F]{40}$", value)
+    elif _type["type"] == "string":
+        return isinstance(value, str)
+    else:
+        return False
+
+# only implement hex string to types
+def castTypes(value, _type):
+    if not isinstance(value, str):
+        return None
+    hexStr = removeHexPrefix(value)
+    i = 0
+    while i < len(hexStr):
+        if hexStr[i] != "0":
+            break
+    hexStr = hexStr[i:]
+    if len(hexStr) % 2 > 0:
+        hexStr = "0" + hexStr
+    
+    if _type["type"] == "uint":
+        return int(hexStr, 16)
+    elif _type["type"] == "int":
+        return int(hexStr, 16)
+    elif _type["type"] == "byte":
+        return hexStr
+    elif _type["type"] == "bytes":
+        return hexStr
+    elif _type["type"] == "bool":
+        if int(hexStr, 16) == 0:
+            return False
+        else:
+            return True
+    elif _type["type"] == "address":
+        if len(hexStr) < 40:
+            hexStr = "0x" + "0" * (40 - len(hexStr)) + hexStr
+        return hexStr
+    elif _type["type"] == "string":
+        return bytes.fromhex(hexStr).decode('utf-8')
+    else:
+        return None
+
+def fillSeeds(value, type_str, seeds):
+    if type_str not in type_list or type_str not in seeds:
+        return
+    _type = type_list[type_str]
+    new_value = castTypes(value, _type)
+    if isType(new_value, _type):
+        seeds[type_str].append(new_value)
 
 
 class TypeHandler():

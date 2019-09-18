@@ -1,8 +1,8 @@
 from pyfuzz.fuzzer.interface import ContractAbi, Transaction
-from pyfuzz.fuzzer.action import Action, ActionProcessor
-from pyfuzz.fuzzer.state import State, StateProcessor
+from pyfuzz.fuzzer.state import State
 from pyfuzz.analyzer.static_analyzer import AnalysisReport
-from pyfuzz.config import TRAIN_CONFIG, FUZZ_CONFIG
+from pyfuzz.config import FUZZ_CONFIG
+from pyfuzz.evm_types.types import fillSeeds
 
 import logging
 from random import random
@@ -38,7 +38,43 @@ class InputGenerator:
         self.state = State(self._gen_blank_txs())
 
     def fill(self, index, state, seeds):
-        pass
+        assert(self.state and index >=0 and index < len(self.state.txList))
+        funcHash = self.state.txList[index].hash
+        if funcHash not in self.contractAbi.interface:
+            raise Exception("function not found in abi")
+        paras = {}
+        for i in range(len(self.contractAbi.interface[funcHash]["inputs"])):
+            _input = self.contractAbi.interface[funcHash]["inputs"][i]
+            _input["index"] = i
+            paras[_input["name"]] = _input
+
+        # add seeds
+        res_seeds = [TypeHandler().seeds for i in range(len(self.state.txList) + 2)]
+        conditions = self.contractAnalysisReport.get_conditions(funcHash)
+        # conditions
+        for _id in conditions:
+            condition = conditions[_id]
+            # add seeds of state values
+            for s in condition["states"]:
+                for d in condition["deps"]:
+                    if s.name not in state or d.name not in paras:
+                        continue
+                    if state[s.name]["type"] == paras[d.name]["type"]:
+                        type_str = state[s.name]["type"]
+                        fillSeeds(state[s.name]["value"], type_str, res_seeds[paras[d.name]["index"]])
+            # TODO: constant literal values
+        # other seeds
+        for s in seeds:
+            type_str = s[0]
+            value = s[1]
+            for p in paras:
+                if p["type"] == type_str:
+                    fillSeeds(value, type_str, res_seeds[p["index"]])
+
+        # generate transaction
+        tx = self.contractAbi.generateTx(funcHash, res_seeds)
+        self.state.txList[index] = tx            
+
 
     def feedback(self, score):
         assert(self.s == 1 and self.state != None)
@@ -66,6 +102,7 @@ class InputGenerator:
     def _check_tx(self, txList, index):
         # the requirements of a transaction in sequence
         assert(index >= 0 and index < len(txList))
+        print(txList)
         txHash = txList[index].hash
 
         if index == len(txList) - 1:
@@ -103,7 +140,7 @@ class InputGenerator:
         raise Exception("something wrong")
 
     def _gen_blank_txs(self):
-        txList = [None for i in range(TRAIN_CONFIG["max_call_num"])]
+        txList = [None for i in range(FUZZ_CONFIG["max_call_num"])]
 
         if len(self.contractAbi.funcHashList) <= 0:
             raise Exception("wrong abi: no available functions to select")
