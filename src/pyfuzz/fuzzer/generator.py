@@ -2,7 +2,7 @@ from pyfuzz.fuzzer.interface import ContractAbi, Transaction
 from pyfuzz.fuzzer.state import State
 from pyfuzz.analyzer.static_analyzer import AnalysisReport
 from pyfuzz.config import FUZZ_CONFIG
-from pyfuzz.evm_types.types import fillSeeds
+from pyfuzz.evm_types.types import fillSeeds, TypeHandler
 
 import logging
 from random import random
@@ -36,6 +36,7 @@ class InputGenerator:
         assert(self.s == 0)
         self.s = 1
         self.state = State(self._gen_blank_txs())
+        return self.state
 
     def fill(self, index, state, seeds):
         assert(self.state and index >=0 and index < len(self.state.txList))
@@ -49,7 +50,7 @@ class InputGenerator:
             paras[_input["name"]] = _input
 
         # add seeds
-        res_seeds = [TypeHandler().seeds for i in range(len(self.state.txList) + 2)]
+        res_seeds = self.contractAbi.seedMap[funcHash]
         conditions = self.contractAnalysisReport.get_conditions(funcHash)
         # conditions
         for _id in conditions:
@@ -68,13 +69,13 @@ class InputGenerator:
             type_str = s[0]
             value = s[1]
             for p in paras:
-                if p["type"] == type_str:
-                    fillSeeds(value, type_str, res_seeds[p["index"]])
+                if paras[p]["type"] == type_str:
+                    fillSeeds(value, type_str, res_seeds[paras[p]["index"]])
 
         # generate transaction
         tx = self.contractAbi.generateTx(funcHash, res_seeds)
-        self.state.txList[index] = tx            
-
+        self.state.txList[index] = tx
+        return self.state         
 
     def feedback(self, score):
         assert(self.s == 1 and self.state != None)
@@ -102,7 +103,6 @@ class InputGenerator:
     def _check_tx(self, txList, index):
         # the requirements of a transaction in sequence
         assert(index >= 0 and index < len(txList))
-        print(txList)
         txHash = txList[index].hash
 
         if index == len(txList) - 1:
@@ -110,14 +110,14 @@ class InputGenerator:
         else:
             f = self.contractAnalysisReport.get_function(txHash)
             if f == None:
-                raise Exception("cannot not find the function in analysis report")
+                return False
             write_set = set(f._vars_written)
             read_set = set([])
             for i in range(index + 1, len(txList)):
                 tmpHash = txList[i].hash
                 f = self.contractAnalysisReport.get_function(tmpHash)
                 if f == None:
-                    raise Exception("cannot not find the function in analysis report")
+                    raise False
                 read_set = read_set.union(f._vars_read)
             return (len(read_set.intersection(write_set)) > 0)
 
@@ -158,6 +158,7 @@ class InputGenerator:
                     txList[i] = None
                 return txList
             selectedHash = self._random_select_tx(candidates)
-            tx = self.contractAbi.generateTx(selectedHash, None)
+            seeds = self.contractAbi.seedMap[selectedHash]
+            tx = self.contractAbi.generateTx(selectedHash, seeds)
             txList[i] = tx
         return txList

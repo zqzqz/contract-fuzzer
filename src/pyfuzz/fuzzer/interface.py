@@ -49,7 +49,8 @@ class ContractAbi:
         self.interface = {}
         self.funcHashList = []
         self.functionHashes = None
-        self.typeHandlers = {}
+        self.typeHandler = TypeHandler()
+        self.seedMap = {}
         self.visited = {}
         self.accounts = accounts
         self.defaultAccount = accounts[0]
@@ -72,6 +73,7 @@ class ContractAbi:
                 self.interface[""] = abi
                 self.visited[""] = 0
                 self.funcHashList.append("")
+                self.seedMap[""] = [TypeHandler().seeds for i in range(2)]
                 continue
             if abi["type"] != "function":
                 continue
@@ -91,7 +93,7 @@ class ContractAbi:
             if sig != None:
                 self.interface[sig] = abi
                 self.visited[sig] = 0
-                self.typeHandlers[sig] = TypeHandler()
+                self.seedMap[sig] = [TypeHandler().seeds for i in range(len(abi["inputs"]) + 2)]
                 self.funcHashList.append(sig)
 
     def shiftHashList(self):
@@ -100,24 +102,10 @@ class ContractAbi:
         self.funcHashList.remove(tmpHash)
         self.funcHashList.append(tmpHash)
 
-    def getSeeds(self, hashList):
-        res = TypeHandler().seeds
-        try:
-            for sig in hashList:
-                if sig not in self.typeHandlers:
-                    continue
-                for _type in self.typeHandlers[sig]:
-                    if _type not in res:
-                        continue
-                    res[_type] = list(set(res[_type] + self.typeHandlers[sig][_type]))
-            return res
-        except:
-            return res
-
     def clearSeeds(self):
         res = TypeHandler().seeds
         for sig in self.funchashList:
-            self.typeHandlers[sig] = res
+            self.seedMap[sig] = [TypeHandler().seeds for i in range(len(self.interface[sig]["inputs"]) + 2)]
 
     def generateTxArgs(self, hash, seeds):
         assert(self.interface[hash] != None)
@@ -125,7 +113,7 @@ class ContractAbi:
         inputAbi = self.interface[hash]["inputs"]
         assert(len(inputAbi) == len(seeds))
         for i in range(len(inputAbi)):
-            data = self.typeHandlers[hash].fuzzByType(inputAbi[i]["type"], FUZZ_CONFIG["seed_prob"], seeds[i])
+            data = self.typeHandler.fuzzByType(inputAbi[i]["type"], FUZZ_CONFIG["seed_prob"], seeds[i])
             args.append(data)
         return args
 
@@ -133,12 +121,12 @@ class ContractAbi:
         assert(self.interface[hash] != None)
         value = 0
         if self.interface[hash]['payable']:
-            value = self.typeHandlers[hash].fuzzByType("payment", FUZZ_CONFIG["seed_prob"], seeds)
+            value = self.typeHandler.fuzzByType("payment", FUZZ_CONFIG["seed_prob"], seeds)
         return value
 
     def generateTxSender(self, hash, seeds):
         assert(self.interface[hash] != None)
-        sender = self.typeHandlers[hash].fuzzByType("address", FUZZ_CONFIG["seed_prob"], seeds)
+        sender = self.typeHandler.fuzzByType("address", FUZZ_CONFIG["seed_prob"], seeds)
         return sender
 
     """

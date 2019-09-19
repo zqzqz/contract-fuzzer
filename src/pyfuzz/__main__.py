@@ -63,6 +63,7 @@ def fuzz(datadir, output, repeat_num, set_timeout, opts):
                             break
                         try:
                             state, done, timeout = env.step()
+                            env.printTxList()
 
                             for r in range(report_num, len(env.report)):
                                 # logger.info("Found:", repr(env.report[r]))

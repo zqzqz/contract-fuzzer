@@ -31,7 +31,7 @@ for i in range(1, 33):
     type_list["bytes" + str(i)] = {"type": "bytes", "size": i * 8}
 
 type_list["bytes"] = {"type": "bytes", "size": 256}
-type_list["payment"] = {"type": "uint", "size": 80}
+type_list["payment"] = {"type": "uint", "size": 128}
 type_list["string"] = {"type": "string", "size": None}
 
 
@@ -98,6 +98,12 @@ def castTypes(value, _type):
         return None
 
 def fillSeeds(value, type_str, seeds):
+    if type_str == "uint":
+        type_str = "uint256"
+    if type_str == "int":
+        type_str = "int256"
+    if type_str == "bytes":
+        type_str = "bytes256"
     if type_str not in type_list or type_str not in seeds:
         return
     _type = type_list[type_str]

@@ -5,6 +5,7 @@ from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
 from pyfuzz.fuzzer.generator import InputGenerator
 from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
 from pyfuzz.fuzzer.detector.exploit import Exploit
+from pyfuzz.evm_types.types import fillSeeds, TypeHandler
 from pyfuzz.config import FUZZ_CONFIG, DIR_CONFIG
 
 import logging
@@ -127,27 +128,28 @@ class Fuzzer():
         seeds = TypeHandler().seeds
 
         for i in range(len(self.state.txList)):
-            self.inputGenerator.fill(i, state, seeds)
-            self.state = self.inputGenerator.state
+            self.state = self.inputGenerator.fill(i, state, seeds)
             tx = self.state.txList[i]
             if not tx:
                 calls.append(0)
                 traces.append([])
                 continue
             
-            features = self.contractAnalysisReport.get_feature(tx.hash)
-            if len(features) > 0:
-                calls.append(self.contractAnalysisReport.get_feature(tx.hash)["call"])
+            # if tx has call, revert it later
+            feature = self.contractAnalysisReport.get_feature(tx.hash)
+            if "call" in feature and feature["call"] > 0:
+                calls.append(feature["call"])
             else:
                 calls.append(0)
             tx.updateVisited()
             self.contractMap[self.filename]["abi"].updateVisited(tx.hash)
 
-            state, trace = self.runOneTx(tx, opts)
+            trace, state = self.runOneTx(tx, opts)
             new_seeds = self.traceAnalyzer.get_seed_candidates([trace])
             for s in new_seeds:
-                if seed[0] in seeds:
-                    seeds[seed[0]].append(seed[1])
+                fillSeeds(s[1], s[0], seeds)
+            for i in range(len(tx.typedArgs)):
+                fillSeeds(tx.typedArgs[i][1], tx.typedArgs[i][0], seeds)
 
             if not trace:
                 trace = []
@@ -165,7 +167,7 @@ class Fuzzer():
                 tx = self.state.txList[i]
                 if not tx:
                     continue
-                state, trace = self.runOneTx(tx, opts)
+                trace, state = self.runOneTx(tx, opts)
                 if trace:
                     traces.append(trace)
         return traces
@@ -174,35 +176,26 @@ class Fuzzer():
         """
         add arguments of a tx list to seeds
         """
-        new_path_flag = False
+        # more_seeds unused
 
         visitedPcList = self.contractMap[self.filename]["visited"]
         j = 0
+
+        if pcs.issubset(visitedPcList):
+            return False
+        logger.debug("find new path")
+        self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs)
+
         for i in range(len(txList)):
             if not txList[i]:
                 continue
-            if pcs[i].issubset(visitedPcList):
-                continue
-
-            logger.debug("find new path")
             
             # get Seeds
-            seeds = self.contractAbi.typeHandlers[txList[i].hash].seeds
+            seeds = self.contractAbi.seedMap[txList[i].hash]
             
-            new_path_flag = True
-            self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[i])
-            
-            for arg in txList[i].typedArgs:
-                if arg[0] not in seeds:
-                    seeds[arg[0]] = [arg[1]]
-                else:
-                    seeds[arg[0]].append(arg[1])
-
-            for seed in more_seeds[i]:
-                if seed[0] in seeds:
-                    seeds[seed[0]].append(seed[1])
-                    logger.debug("load seed", seed)
-        return new_path_flag
+            for i in range(len(txList[i].typedArgs)):
+                fillSeeds(txList[i].typedArgs[i][1], txList[i].typedArgs[i][0], seeds[i])
+        return True
 
     def reset(self):
         """

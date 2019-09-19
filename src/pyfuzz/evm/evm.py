@@ -48,7 +48,11 @@ class EvmHandler():
         if "bytecode" in contract:
             new_contract["bytecode"] = contract["bytecode"]
         else:
-            return None
+            raise Exception("Invalid contract format")
+        if "interface" in contract:
+            new_contract["interface"] = contract["interface"]
+        else:
+            raise Exception("Invalid contract format")
         contractRpc = pyfuzz.evm.evm_pb2.Json(data=json.dumps(new_contract))
         ret = None
         for i in self.stub.Deploy(contractRpc):

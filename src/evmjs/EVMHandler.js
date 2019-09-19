@@ -42,7 +42,7 @@ EVMHandler = {
   web3: new Web3(),
   // a nonce
   t: 12,
-  defaultBalance: "ffffffffffffffffffffffffffffffff",
+  defaultBalance: "ffffffffffffffffffffffffffffffffffffffffffffffff",
   startTime: new Date().getTime() / 1000 | 0,
   txCnt: 0,
   contractCount: 0,
@@ -176,7 +176,7 @@ EVMHandler = {
           }
           // init balance for newly deployed contracts
           let address = Buffer.from(result.address.replace("0x", ""), "hex")
-          EVMHandler.contracts[result.address] = { "interface": contract.interface }
+          EVMHandler.contracts[result.address.replace("0x", "")] = { interface: contract.interface }
           let account = EVMHandler.stateTrie.get(address, (err, accData) => {
             let account = new Account(accData);
             // let rand_len = Math.floor(Math.random() * 24 + 8)
@@ -201,13 +201,12 @@ EVMHandler = {
 
   queryState: (to) => {
     return new Promise((resolve, reject) => {
-      abi = JSON.parse(EVMHandler.contracts[to].interface)
+      abi = JSON.parse(EVMHandler.contracts[to.replace("0x", "")].interface)
       state = {}
       async.eachSeries(abi, (f, next) => {
-        console.log(f["name"])
         try {
           if (f["constant"] == true && f["inputs"].length == 0) {
-            EVMHandler.sendFormatTx(EVMHandler.defaultAccount, to, 0, f["name"], []).then((result) => {
+            EVMHandler.sendFormatTx(EVMHandler.defaultAccount, to.replace("0x", ""), 0, f["name"], []).then((result) => {
               state[f["name"]] = {
                 "name": f["name"],
                 "type": f["outputs"][0]["type"],
@@ -229,6 +228,7 @@ EVMHandler = {
 
   // send a raw transaction
   sendTx: (from, to, value, data, revertCallFlag=false) => {
+    // console.log(from, to, value, data)
     if (value == "") value = "0";
     return new Promise((resolve, reject) => {
       EVMHandler.txCnt += 1;
@@ -257,7 +257,6 @@ EVMHandler = {
           reject(error);
         }
         txHash = utileth.bufferToHex(tx.hash());
-        // resolve(result)
         EVMHandler.web3vm.eth.getTransaction(txHash, (err, evmTx) => {
           evmTx.to = to;
           if (err) {
@@ -266,7 +265,11 @@ EVMHandler = {
             if (result == null || result === undefined) reject(null)
             else { 
               result.tx = evmTx;
-              result.tx.returnValue = utileth.bufferToHex(result.vm.runState.returnValue);
+              if (result.tx.returnValue) {
+                result.tx.returnValue = utileth.bufferToHex(result.vm.runState.returnValue);
+              } else {
+                result.tx.returnValue = ""
+              }
               resolve(result);
             }
           }
@@ -277,7 +280,7 @@ EVMHandler = {
 
   // send transaction with formatted inputs
   sendFormatTx: (from, to, value, func, args) => {
-    let abi = JSON.parse(EVMHandler.contracts[to].interface)
+    let abi = JSON.parse(EVMHandler.contracts[to.replace("0x", "")].interface)
     let funcAbi = null;
     for(let i in abi) {
       if (abi[i]["name"] == func) {
