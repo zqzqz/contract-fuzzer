@@ -1,11 +1,12 @@
 import logging
-import os
+import os, re
 import codecs
 import random
 import json
 import string
 
 from pyfuzz.config import DIR_CONFIG
+from pyfuzz.utils.utils import removeHexPrefix
 
 logger = logging.getLogger("types")
 logger.setLevel(logging.INFO)

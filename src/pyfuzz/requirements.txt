@@ -9,9 +9,6 @@ gast==0.2.2
 grpcio==1.18.0
 grpcio-tools==1.18.0
 h5py==2.9.0
-Keras-Applications==1.0.7
-Keras-Preprocessing==1.0.8
-Markdown==3.0.1
 mock==2.0.0
 numpy==1.16.1
 parsimonious==0.8.1
@@ -22,9 +19,3 @@ psutil==5.6.0
 pysha3==1.0.2
 six==1.12.0
 slither-analyzer==0.6.0
-tensorboard==1.13.0
-tensorflow==1.13.1
-tensorflow-estimator==1.13.0
-termcolor==1.1.0
-toolz==0.9.0
-Werkzeug==0.14.1

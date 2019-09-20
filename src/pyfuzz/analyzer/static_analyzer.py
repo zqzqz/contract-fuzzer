@@ -103,7 +103,8 @@ class StaticAnalyzer(IrAnalyzer):
     def extract_feature(self):
         for function in self.contract.functions:
             function.features = {
-                "call": len(function._external_calls_as_expressions),
+                "call": len(function.external_calls_as_expressions + function.all_internal_calls() + 
+                    function.all_low_level_calls() + function.all_high_level_calls() + function.all_library_calls()),
                 "msg": 0,
                 "block": 0,
                 "args": len(function.parameters),

@@ -103,14 +103,12 @@ def main():
         "--datadir", help="directory containing contract source files")
     parser.add_argument("--output", type=str,
                         help="output report", default="report.json")
-    parser.add_argument("--episode", type=int,
-                        help="number of episode", default=100)
     parser.add_argument("--exploit", action='store_const',
                         default=False, const=True, help="find exploitations")
     parser.add_argument("--vulnerability", action='store_const',
                         default=False, const=True, help="find vulnerabilities")
     parser.add_argument("--repeat", type=int,
-                        help="repeated number of testing", default=10)
+                        help="repeated number of testing", default=1)
     parser.add_argument("--timeout", type=int,
                         help="timeout", default=120)    
 
@@ -122,9 +120,7 @@ def main():
         "exploit": args.exploit,
         "vulnerability": args.vulnerability
     }
-    if args.cmd == "train":
-        train(args.datadir, args.episode, opts)
-    elif args.cmd == "fuzz":
+    if args.cmd == "fuzz":
         fuzz(args.datadir, args.output, args.repeat, args.timeout, opts)
     else:
         logger.exception("command {} is not found".format(args.cmd))

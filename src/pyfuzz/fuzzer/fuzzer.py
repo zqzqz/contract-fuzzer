@@ -40,7 +40,6 @@ class Fuzzer():
         self.contractMap = {}
         self.contractAddress = None
         # execution results
-        self.state = State([])
         self.traces = []
         self.report = []
         # eth accounts
@@ -55,11 +54,17 @@ class Fuzzer():
         with open(os.path.join(DIR_CONFIG["seed_dir"], 'address.json'), 'w') as f:
             json.dump(list(self.accounts.keys()), f, indent="\t")
 
+    @property
+    def state(self):
+        if self.inputGenerator != None:
+            return self.inputGenerator.state
+        else:
+            return None
+
     def refreshEvm(self):
         self.evm.reset()
 
     def loadContract(self, filename, contract_name):
-        self.state = None
         self.seqLen = None
         self.traces = []
         self.report = []
@@ -128,7 +133,7 @@ class Fuzzer():
         seeds = TypeHandler().seeds
 
         for i in range(len(self.state.txList)):
-            self.state = self.inputGenerator.fill(i, state, seeds)
+            self.inputGenerator.fill(i, seeds)
             tx = self.state.txList[i]
             if not tx:
                 calls.append(0)
@@ -162,8 +167,7 @@ class Fuzzer():
             # revert all calls when executing transactions
             opts["revert"] = True
             for i in range(len(self.state.txList)):
-                self.inputGenerator.fill(i, state, seeds)
-                self.state = self.inputGenerator.state
+                self.inputGenerator.fill(i, seeds)
                 tx = self.state.txList[i]
                 if not tx:
                     continue
@@ -187,7 +191,7 @@ class Fuzzer():
         self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs)
 
         for i in range(len(txList)):
-            if not txList[i]:
+            if txList[i] == None:
                 continue
             
             # get Seeds
@@ -207,7 +211,6 @@ class Fuzzer():
             raise Exception("fuzzer error")
         self.contractAddress = self.evm.deploy(self.contract)
 
-        self.state = None
         self.traces = []
         self.report = []
         return self.state
@@ -249,7 +252,7 @@ class Fuzzer():
             # testing
             if self.counter >= FUZZ_CONFIG["max_attempt"]:
                 timeout = 1
-            self.state = self.inputGenerator.generate()
+            self.inputGenerator.generate()
             # execute transactions
             traces = self.runTxs()
             # get reports of executions

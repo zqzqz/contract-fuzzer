@@ -21,6 +21,9 @@ hexCode = {
     "f": [1, 1, 1, 1],
 }
 
+def isHexString(hexStr):
+    return isinstance(hexStr, str) and re.match("^(0x)?[0-9a-fA-F]*$", hexStr)
+
 def hexToUint8(hexStr, size=None):
     assert(size == None or size > 0)
     hexStr = removeHexPrefix(hexStr)

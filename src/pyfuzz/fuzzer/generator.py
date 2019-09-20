@@ -38,8 +38,10 @@ class InputGenerator:
         self.state = State(self._gen_blank_txs())
         return self.state
 
-    def fill(self, index, state, seeds):
+    def fill(self, index, seeds):
         assert(self.state and index >=0 and index < len(self.state.txList))
+        if self.state.txList[index] == None:
+            return
         funcHash = self.state.txList[index].hash
         if funcHash not in self.contractAbi.interface:
             raise Exception("function not found in abi")

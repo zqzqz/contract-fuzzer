@@ -17,4 +17,5 @@ experiments*
 /src/*.txt
 /src/*.csv
 *.tar.gz
-venv
+/src/venv
+/src/python3.6
