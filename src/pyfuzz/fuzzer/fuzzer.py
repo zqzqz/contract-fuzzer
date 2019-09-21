@@ -84,17 +84,16 @@ class Fuzzer():
                 with open(filename, "r",encoding="utf-8") as f:
                     source = f.read()
                 self.contract = self.evm.compile(source, contract_name)
-                
                 # the address is not used
                 # test the deployment
-                contractAddress = self.evm.deploy(self.contract)
-                if not contractAddress:
+                self.contractAddress = self.evm.deploy(self.contract)
+                if not self.contractAddress:
                     return False
                 
                 self.contractAbi = ContractAbi(self.contract, list(self.accounts.keys()))
                 # run static analysis
                 self.staticAnalyzer.load_contract(filename, contract_name)
-                self.contractAnalysisReport = self.staticAnalyzer.run()
+                self.contractAnalysisReport = self.staticAnalyzer.run(self.contractAbi.functionHashes)
                 # for mutation schedualing
                 self.inputGenerator = InputGenerator(self.contractAbi, self.contractAnalysisReport)
                 # set cache
@@ -123,7 +122,12 @@ class Fuzzer():
                                 str(tx.value), tx.payload, opts)
         if not result:
             raise Exception("no result from sendTx")
-        return result["trace"], result["state"]
+        
+        if ("trace" in result and result["trace"] != None) and ("state" in result and result["state"] != None):
+            return result["trace"], result["state"]
+        else:
+            logger.error("Transaction failed: {}".format(tx))
+            return [], {}
 
     def runTxs(self):
         traces = []
@@ -132,6 +136,10 @@ class Fuzzer():
         state = []
         seeds = TypeHandler().seeds
 
+        self.contractAddress = self.evm.deploy(self.contract)
+        if not self.contractAddress:
+            raise Exception("fuzzer: cannot deploy contract")
+        
         for i in range(len(self.state.txList)):
             self.inputGenerator.fill(i, seeds)
             tx = self.state.txList[i]
@@ -270,7 +278,6 @@ class Fuzzer():
                 for acc in self.accounts.keys():
                     bal_p += int(str(FUZZ_CONFIG["account_balance"]), 16)
                     bal += int(str(self.accounts[acc]), 16)
-
                 if bal > bal_p:
                     report.append(Exploit("BalanceIncrement", self.state.txList))
             # fill in transasactions for exploitation

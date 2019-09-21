@@ -11,6 +11,7 @@ import sys, os
 import json
 import random
 import traceback
+import time
 
 logging.basicConfig()
 logger = logging.getLogger("pyfuzz")
@@ -35,21 +36,20 @@ def fuzz(datadir, output, repeat_num, set_timeout, opts):
         contract_name = filename.split('.')[0].split("#")[-1]
 
         if filename not in report:
-            report[filename] = {}
+            tmp_report = {}
         else:
             continue
 
         if not env.loadContract(full_filename, contract_name):
-            continue
-
-        # contracts without calls do not worth exploit generation
-        if env.contract["opcodes"].count("CALL ") == 0:
+            # wait for recovery
+            time.sleep(5)
             continue
         
+        write_flag = False
         for i in range(repeat_num):
             try:
                 with Timeout(set_timeout):
-                    report[filename][i] = {
+                    tmp_report[i] = {
                         "reports": [],
                         "coverage": 0,
                         "attempt": 0
@@ -63,16 +63,26 @@ def fuzz(datadir, output, repeat_num, set_timeout, opts):
                             break
                         try:
                             state, done, timeout = env.step()
-                            env.printTxList()
+                            # env.printTxList()
 
                             for r in range(report_num, len(env.report)):
                                 # logger.info("Found:", repr(env.report[r]))
-                                report[filename][i]["reports"].append({"report": repr(env.report[r]), "attempt": env.counter})
+                                tmp_report[i]["reports"].append({"report": repr(env.report[r]), "attempt": env.counter})
                             report_num = len(env.report)
+
+                            if timeout:
+                                logger.info("contract {} finished with counter {}".format(
+                                    filename, env.counter))
+                                break
 
                             if "exploit" in opts and opts["exploit"] == True and report_num > 0:
                                 logger.info("exploit found")
                                 env.printTxList()
+                                logger.info("contract {} finished with counter {}".format(
+                                    filename, env.counter))
+                                tmp_report[i]["coverage"] = env.coverage()
+                                tmp_report[i]["attempt"] = env.counter
+                                write_flag = True
                                 break
 
                         except Exception as e:
@@ -80,19 +90,20 @@ def fuzz(datadir, output, repeat_num, set_timeout, opts):
                                 logger.error("Time is out for contract {} at test {}".format(filename, repeat_num))
                             else:
                                 logger.error("Error {} {}".format(str(e), traceback.format_exc()))
+                                # wait for recovery
+                                time.sleep(5)
                             done, timeout = 0, 0, 0
                             break
             except Exception as e:
                 logger.error("Error {} {}".format(str(e), traceback.format_exc()))
-
-            logger.info("contract {} finished with counter {}".format(
-                filename, env.counter))
-            report[filename][i]["coverage"] = env.coverage()
-            report[filename][i]["attempt"] = env.counter
-
-        with open(output, "w") as f:
-            json.dump(report, f, indent=4)
-            logger.info("Result written")
+                # wait for recovery
+                time.sleep(5)
+    
+        if write_flag:
+            report[filename] = tmp_report
+            with open(output, "w") as f:
+                json.dump(report, f, indent=4)
+                logger.info("Result written")
 
 
 def main():

@@ -46,7 +46,7 @@ EVMHandler = {
   startTime: new Date().getTime() / 1000 | 0,
   txCnt: 0,
   contractCount: 0,
-  maxContractCount: 300,
+  maxContractCount: 10,
 
   autoInit: () => {
     return new Promise((resolve, reject) => {
@@ -179,8 +179,8 @@ EVMHandler = {
           EVMHandler.contracts[result.address.replace("0x", "")] = { interface: contract.interface }
           let account = EVMHandler.stateTrie.get(address, (err, accData) => {
             let account = new Account(accData);
-            // let rand_len = Math.floor(Math.random() * 24 + 8)
-            account.balance = Buffer.from(EVMHandler.defaultBalance, "hex");
+            let rand_len = Math.floor(Math.random() * 32 + 24)
+            account.balance = Buffer.from("f".repeat(rand_len), "hex");
             EVMHandler.stateTrie.put(address, account.serialize(), () => {
               resolve(result);
             })
@@ -246,7 +246,7 @@ EVMHandler = {
       tx.sign(Buffer.from(EVMHandler.accounts[from], 'hex'));
       let block = new Block({
         header: {
-          timestamp: EVMHandler.startTime + EVMHandler.txCnt * 3600 * 24 * 5,
+          timestamp: EVMHandler.startTime + EVMHandler.txCnt * 3600 * 24 * Math.floor(Math.random() * 30 + 1),
           number: 0
         },
         transactions: [],
@@ -265,8 +265,8 @@ EVMHandler = {
             if (result == null || result === undefined) reject(null)
             else { 
               result.tx = evmTx;
-              if (result.tx.returnValue) {
-                result.tx.returnValue = utileth.bufferToHex(result.vm.runState.returnValue);
+              if (result.vm.return) {
+                result.tx.returnValue = utileth.bufferToHex(result.vm.return);
               } else {
                 result.tx.returnValue = ""
               }

@@ -2,7 +2,8 @@ from pyfuzz.fuzzer.interface import ContractAbi, Transaction
 from pyfuzz.fuzzer.state import State
 from pyfuzz.analyzer.static_analyzer import AnalysisReport
 from pyfuzz.config import FUZZ_CONFIG
-from pyfuzz.evm_types.types import fillSeeds, TypeHandler
+from pyfuzz.evm_types.types import fillSeeds, cleanTypeNames, TypeHandler
+from pyfuzz.utils.utils import isHexString, isIntString
 
 import logging
 from random import random
@@ -59,13 +60,27 @@ class InputGenerator:
             condition = conditions[_id]
             # add seeds of state values
             for s in condition["states"]:
+                s_type = cleanTypeNames(s["type"])
+                if s_type != None:
+                    continue
                 for d in condition["deps"]:
-                    if s.name not in state or d.name not in paras:
+                    if s == None or d.name not in paras:
                         continue
-                    if state[s.name]["type"] == paras[d.name]["type"]:
-                        type_str = state[s.name]["type"]
-                        fillSeeds(state[s.name]["value"], type_str, res_seeds[paras[d.name]["index"]])
-            # TODO: constant literal values
+                    p_type = cleanTypeNames(paras[d.name]["type"])
+                    if s_type == p_type:
+                        fillSeeds(s["value"], s_type, res_seeds[paras[d.name]["index"]])
+            # constant literal values
+            for n in condition["consts"]:
+                if not isinstance(n, str):
+                    continue
+                for d in condition["deps"]:
+                    if n == None or d.name not in paras:
+                        continue
+                    p_type = cleanTypeNames(paras[d.name]["type"])
+                    if isHexString(n) and p_type == "bytes32":
+                        fillSeeds(n, p_type, res_seeds[paras[d.name]["index"]])
+                    if isIntString(n) and p_type == "uint256":
+                        fillSeeds(int(n,10), p_type, res_seeds[paras[d.name]["index"]])
         # other seeds
         for s in seeds:
             type_str = s[0]
@@ -104,24 +119,27 @@ class InputGenerator:
 
     def _check_tx(self, txList, index):
         # the requirements of a transaction in sequence
-        assert(index >= 0 and index < len(txList))
-        txHash = txList[index].hash
+        try:
+            assert(index >= 0 and index < len(txList))
+            txHash = txList[index].hash
 
-        if index == len(txList) - 1:
-            return self.contractAnalysisReport.is_function_critical(txHash)
-        else:
-            f = self.contractAnalysisReport.get_function(txHash)
-            if f == None:
-                return False
-            write_set = set(f._vars_written)
-            read_set = set([])
-            for i in range(index + 1, len(txList)):
-                tmpHash = txList[i].hash
-                f = self.contractAnalysisReport.get_function(tmpHash)
-                if f == None:
-                    raise False
-                read_set = read_set.union(f._vars_read)
-            return (len(read_set.intersection(write_set)) > 0)
+            if index == len(txList) - 1:
+                return self.contractAnalysisReport.is_function_critical(txHash)
+            else:
+                f = self.contractAnalysisReport.get_function(txHash)
+                write_set = set(f._vars_written)
+                read_set = set([])
+                for i in range(index + 1, len(txList)):
+                    tmpHash = txList[i].hash
+                    f = self.contractAnalysisReport.get_function(tmpHash)
+                    if f == None:
+                        raise False
+                    read_set = read_set.union(f._vars_read)
+                return (len(read_set.intersection(write_set)) > 0)
+        except Exception as e:
+            import traceback
+            logger.error("generator._check_tx: {} {}".format(str(e), traceback.format_exc()))
+            return False
 
     def _func_weight(self, funcHash):
         return self.func_history[funcHash][0]/((self.func_history[funcHash][0] + self.func_history[funcHash][1]) or 1) + 0.2

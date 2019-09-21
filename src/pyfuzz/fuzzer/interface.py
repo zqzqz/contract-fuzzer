@@ -13,13 +13,17 @@ class Transaction:
         self.abi = abi
         self.tmp_visited = tmp_visited
         self.total_visited = total_visited
+        if "name" in self.abi:
+            self.name = self.abi["name"]
+        else:
+            self.name = "callback"
 
     @property
     def payload(self):
-        payload = ""
+        payload = self.hash
         if len(self.args) > 0:
             abi_array = self.inputTypes
-            payload = self.hash + eth_abi.encode_abi(abi_array, self.args).hex()
+            payload += eth_abi.encode_abi(abi_array, self.args).hex()
         return payload
 
     @property
@@ -33,7 +37,7 @@ class Transaction:
         return [abi_input["type"] for abi_input in self.abi["inputs"]]
 
     def __repr__(self):
-        return "payload: {}, sender: {}, value: {}".format(self.payload, self.sender, self.value)
+        return "name: {}, args: {}, sender: {}, value: {}".format(self.name, self.args, self.sender, self.value)
 
     def __eq__(self, other):
         return self.__class__ == self.__class__ and self.__repr__() == self.__repr__()
@@ -77,7 +81,7 @@ class ContractAbi:
                 continue
             if abi["type"] != "function":
                 continue
-            if abi["stateMutability"]=="view":
+            if abi["stateMutability"] in ["view", "pure"]:
                 continue
 
             name = abi["name"]

@@ -6,7 +6,7 @@ import json
 import string
 
 from pyfuzz.config import DIR_CONFIG
-from pyfuzz.utils.utils import removeHexPrefix
+from pyfuzz.utils.utils import removeHexPrefix, isHexString
 
 logger = logging.getLogger("types")
 logger.setLevel(logging.INFO)
@@ -47,7 +47,7 @@ seed_dir = DIR_CONFIG["seed_dir"]
 
 def isType(value, _type):
     if _type["type"] == "uint":
-        return isinstance(value, int) and numvalueber >= 0 and value < 2**_type["size"]
+        return isinstance(value, int) and value >= 0 and value < 2**_type["size"]
     elif _type["type"] == "int":
         return isinstance(value, int) and value >= -2**(_type["size"]-1) and value < 2**(_type["size"]-1)
     elif _type["type"] == "byte":
@@ -67,6 +67,7 @@ def isType(value, _type):
 def castTypes(value, _type):
     if not isinstance(value, str):
         return None
+    
     hexStr = removeHexPrefix(value)
     i = 0
     while i < len(hexStr):
@@ -98,19 +99,39 @@ def castTypes(value, _type):
     else:
         return None
 
-def fillSeeds(value, type_str, seeds):
+def cleanTypeNames(type_str):
     if type_str == "uint":
-        type_str = "uint256"
-    if type_str == "int":
-        type_str = "int256"
-    if type_str == "bytes":
-        type_str = "bytes256"
-    if type_str not in type_list or type_str not in seeds:
-        return
-    _type = type_list[type_str]
-    new_value = castTypes(value, _type)
-    if isType(new_value, _type):
-        seeds[type_str].append(new_value)
+        return "uint256"
+    elif type_str == "int":
+        return "int256"
+    elif type_str == "bytes":
+        return "bytes32"
+    elif type_str in type_list:
+        return type_str
+    else:
+        return None
+
+
+def fillSeeds(value, type_str, seeds):
+    try:
+        raw_label = False
+        if isHexString(value):
+            raw_label = True
+
+        type_str = cleanTypeNames(type_str)
+        if not type_str:
+            return
+
+        if type_str not in type_list or type_str not in seeds:
+            return
+
+        _type = type_list[type_str]
+        if raw_label:
+            value = castTypes(value, _type)
+        if isType(value, _type):
+            seeds[type_str].append(value)
+    except Exception as e:
+        raise Exception("error filling seeds {}".format(str(e)))
 
 
 class TypeHandler():
@@ -204,14 +225,17 @@ class TypeHandler():
             else:
                 # allocate the default account with larger probability
                 if _type == "address":
-                    if random.random() < 0.5:
+                    if random.random() < 0.8:
                         return type_seeds[0]
                 rand_index = random.randint(0, len(type_seeds)-1)
                 return type_seeds[rand_index]
         
         # if not seed mode
         if type_obj["type"] == "uint":
-            num_size = random.randint(1, type_obj["size"])
+            if _type == "payment":
+                num_size = random.randint(50, 80)
+            else:
+                num_size = random.randint(1, type_obj["size"])
             if mode == "min":
                 selected_uint = self.generateMinIntValue(0)
             elif mode == "max":
@@ -297,7 +321,7 @@ class TypeHandler():
             array_len = random.randint(0, 3)
             selected_array = []
             for i in range(array_len):
-                selected_array.append(self.generateValueByType(type_obj["element_type"], mode))
+                selected_array.append(self.generateValueByType(type_obj["element_type"], seeds, mode))
             return selected_array
 
         else:

@@ -17,26 +17,28 @@ def print_reports(reports):
 
 
 class AnalysisReport():
-    def __init__(self, contract):
+    def __init__(self, contract, functionHashes):
         self.contract = contract
         self.func_map = {}
         for function in contract.functions:
             if not(function.visibility in ["public","external"]):
                 continue
-            full_name = function.full_name
-            func_hash = eth_utils.keccak(text=full_name).hex()[:8]
-            self.func_map[func_hash] = function
+            # pass in functionHashes because of the difference of function full_name in slither and eth_abi
+            if function.name == "fallback":
+                self.func_map[""] = function
+            else:
+                for full_name in functionHashes:
+                    if full_name.startswith(function.name + "("):
+                        self.func_map[functionHashes[full_name]] = function
 
     def get_function(self, func_hash):
         if func_hash in self.func_map:
             return self.func_map[func_hash]
         else:
-            return None
+            raise Exception("AnalysisReport.get_function: function not exist in analysis")
 
     def get_dependency(self, func_hash):
         if func_hash not in self.func_map:
-            if func_hash == "":
-                return {}
             raise Exception("AnalysisReport.get_dependency: function not exist in analysis")
         else:
             for v in self.func_map[func_hash].taintList:
@@ -53,24 +55,18 @@ class AnalysisReport():
 
     def get_data_dependency(self, func_hash):
         if func_hash not in self.func_map:
-            if func_hash == "":
-                return {}
             raise Exception("AnalysisReport: function not exist in analysis")
         else:
             return self.func_map[func_hash].taintList
 
     def get_control_dependency(self, func_hash):
         if func_hash not in self.func_map:
-            if func_hash == "":
-                return {}
             raise Exception("AnalysisReport: function not exist in analysis")
         else:
             return self.func_map[func_hash].conditionList
 
     def get_conditions(self, func_hash):
         if func_hash not in self.func_map:
-            if func_hash == "":
-                return {}
             raise Exception("AnalysisReport: function not exist in analysis")
         else:
             return self.func_map[func_hash].conditions
@@ -104,7 +100,7 @@ class StaticAnalyzer(IrAnalyzer):
         for function in self.contract.functions:
             function.features = {
                 "call": len(function.external_calls_as_expressions + function.all_internal_calls() + 
-                    function.all_low_level_calls() + function.all_high_level_calls() + function.all_library_calls()),
+                    function.all_low_level_calls() + function.all_high_level_calls()),
                 "msg": 0,
                 "block": 0,
                 "args": len(function.parameters),
@@ -462,7 +458,7 @@ class StaticAnalyzer(IrAnalyzer):
                         if not(function.conditionList[mark]):
                             del function.conditionList[mark]
       
-    def run(self, debug=0):
+    def run(self, functionHashes, debug=0):
         """
             return an AnalysisReport object, the report has the format:
             function full name (key) => a list of numbers
@@ -479,5 +475,5 @@ class StaticAnalyzer(IrAnalyzer):
         if debug:
             print_reports(report)
 
-        self.report=AnalysisReport(contract)
+        self.report=AnalysisReport(contract, functionHashes)
         return self.report
