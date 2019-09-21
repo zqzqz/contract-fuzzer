@@ -49,7 +49,7 @@ class InputGenerator:
 
         """
             disable L2 properties: dynamic seeds
-            
+
         paras = {}
         for i in range(len(self.contractAbi.interface[funcHash]["inputs"])):
             _input = self.contractAbi.interface[funcHash]["inputs"][i]
@@ -127,6 +127,9 @@ class InputGenerator:
             self.func_history_delta[funcHash] = [0, 0]
 
     def _check_tx(self, txList, index):
+        """
+            disable L1 properties: taint constraints
+
         # the requirements of a transaction in sequence
         try:
             assert(index >= 0 and index < len(txList))
@@ -149,6 +152,8 @@ class InputGenerator:
             import traceback
             logger.error("generator._check_tx: {} {}".format(str(e), traceback.format_exc()))
             return False
+        """
+        return True
 
     def _func_weight(self, funcHash):
         return self.func_history[funcHash][0]/((self.func_history[funcHash][0] + self.func_history[funcHash][1]) or 1) + 0.2
