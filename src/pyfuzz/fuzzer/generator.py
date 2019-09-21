@@ -46,6 +46,10 @@ class InputGenerator:
         funcHash = self.state.txList[index].hash
         if funcHash not in self.contractAbi.interface:
             raise Exception("function not found in abi")
+
+        """
+            disable L2 properties: dynamic seeds
+            
         paras = {}
         for i in range(len(self.contractAbi.interface[funcHash]["inputs"])):
             _input = self.contractAbi.interface[funcHash]["inputs"][i]
@@ -88,8 +92,13 @@ class InputGenerator:
             for p in paras:
                 if paras[p]["type"] == type_str:
                     fillSeeds(value, type_str, res_seeds[paras[p]["index"]])
+        """
 
         # generate transaction
+        """
+            disable L2 properties: dynamic seeds
+        """
+        res_seeds = [TypeHandler().seeds for i in range(len(self.contractAbi.interface[funcHash]["inputs"]) + 2)]
         tx = self.contractAbi.generateTx(funcHash, res_seeds)
         self.state.txList[index] = tx
         return self.state         
