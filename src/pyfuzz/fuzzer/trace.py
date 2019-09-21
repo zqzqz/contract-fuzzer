@@ -21,9 +21,12 @@ class TraceAnalyzer:
     def run(self, ptraces, ctraces):
         p_pcs = self.get_pcs(ptraces)
         c_pcs = self.get_pcs(ctraces)
-        reward = self.path_variaty(p_pcs, c_pcs)
+        """
+            disable L3 properties: coverage feedback
+        """
+        # reward = self.path_variaty(p_pcs, c_pcs)
         report = list(set(self.detector.run(ctraces)))
-        return reward, report, c_pcs
+        return 0, report, c_pcs
 
     def get_seed_candidates(self, ctraces):
         seeds = []
