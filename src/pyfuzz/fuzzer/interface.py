@@ -16,10 +16,10 @@ class Transaction:
 
     @property
     def payload(self):
-        payload = ""
+        payload = self.hash
         if len(self.args) > 0:
             abi_array = self.inputTypes
-            payload = self.hash + eth_abi.encode_abi(abi_array, self.args).hex()
+            payload += eth_abi.encode_abi(abi_array, self.args).hex()
         return payload
 
     @property
@@ -77,7 +77,7 @@ class ContractAbi:
                 continue
             if abi["type"] != "function":
                 continue
-            if abi["stateMutability"]=="view":
+            if abi["stateMutability"] in ["view", "pure"]:
                 continue
 
             name = abi["name"]

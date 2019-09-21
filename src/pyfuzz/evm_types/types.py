@@ -204,14 +204,17 @@ class TypeHandler():
             else:
                 # allocate the default account with larger probability
                 if _type == "address":
-                    if random.random() < 0.5:
+                    if random.random() < 0.8:
                         return type_seeds[0]
                 rand_index = random.randint(0, len(type_seeds)-1)
                 return type_seeds[rand_index]
         
         # if not seed mode
         if type_obj["type"] == "uint":
-            num_size = random.randint(1, type_obj["size"])
+            if _type == "payment":
+                num_size = random.randint(50, 80)
+            else:
+                num_size = random.randint(1, type_obj["size"])
             if mode == "min":
                 selected_uint = self.generateMinIntValue(0)
             elif mode == "max":

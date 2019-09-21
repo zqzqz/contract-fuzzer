@@ -4,7 +4,7 @@ FUZZ_CONFIG = {
     "max_call_num": 3,
     "seed_prob": 0.6,
     "account_balance": "0xffffffffffffffffffffffffffffffffffffffffffffffff",
-    "max_attempt": 100
+    "max_attempt": 1000
 }
 
 DIR_CONFIG = {}
