@@ -266,9 +266,13 @@ class Fuzzer():
             # get reports of executions
             reward, report, pcs = self.traceAnalyzer.run(self.traces, traces)
             self.traces = traces
+            """
+                disable L3 properties: coverage feedback
+            
             # update seeds
             if self.loadSeed(self.state.txList, pcs, []):
                 logger.debug("new path discovered")
+            """
             # check whether exploitation happens
             if self.opts["exploit"]:
                 self.accounts = self.evm.getAccounts()
