@@ -42,7 +42,7 @@ class InputGenerator:
     def fill(self, index, seeds):
         assert(self.state and index >=0 and index < len(self.state.txList))
         if self.state.txList[index] == None:
-            return
+            # return
         funcHash = self.state.txList[index].hash
         if funcHash not in self.contractAbi.interface:
             raise Exception("function not found in abi")
@@ -60,7 +60,7 @@ class InputGenerator:
             condition = conditions[_id]
             # add seeds of state values
             for s in condition["states"]:
-                s_type = cleanTypeNames(s["type"])
+                s_type = cleanTypeNames(s._type)
                 if s_type != None:
                     continue
                 for d in condition["deps"]:
