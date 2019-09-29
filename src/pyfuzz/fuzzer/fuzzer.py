@@ -4,6 +4,7 @@ from pyfuzz.fuzzer.state import State
 from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
 from pyfuzz.fuzzer.generator import InputGenerator
 from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
+from pyfuzz.analyzer.cfg_analyzer import CFGAnalyzer
 from pyfuzz.fuzzer.detector.exploit import Exploit
 from pyfuzz.evm_types.types import fillSeeds, TypeHandler
 from pyfuzz.config import FUZZ_CONFIG, DIR_CONFIG
@@ -48,6 +49,7 @@ class Fuzzer():
         # analyzers
         self.traceAnalyzer = TraceAnalyzer(opts)
         self.staticAnalyzer = StaticAnalyzer()
+        self.cfgAnalyzer = CFGAnalyzer()
         # for test
         self.counter = 0
         # eth accounts as seeds of type address
@@ -89,7 +91,7 @@ class Fuzzer():
                 self.contractAddress = self.evm.deploy(self.contract)
                 if not self.contractAddress:
                     return False
-                
+                self.cfgAnalyzer = CFGAnalyzer(self.contract['bytecode'],contract_name)
                 self.contractAbi = ContractAbi(self.contract, list(self.accounts.keys()))
                 # run static analysis
                 self.staticAnalyzer.load_contract(filename, contract_name)
@@ -254,17 +256,18 @@ class Fuzzer():
     def step(self):
         done = 0
         self.counter += 1
-        reward = 0
+        reward = None
         timeout = 0
         try:
             # testing
             if self.counter >= FUZZ_CONFIG["max_attempt"]:
                 timeout = 1
+            pstate = self.state
             self.inputGenerator.generate()
             # execute transactions
             traces = self.runTxs()
             # get reports of executions
-            reward, report, pcs = self.traceAnalyzer.run(self.traces, traces)
+            reward, report, pcs = self.traceAnalyzer.run(self.traces, pstate, traces, self.state, self.cfgAnalyzer)
             self.traces = traces
             # update seeds
             if self.loadSeed(self.state.txList, pcs, []):
@@ -291,7 +294,7 @@ class Fuzzer():
             self.traces = traces
             # should exclude repeated reports
             self.report = list(set(self.report + report))
-            self.inputGenerator.feedback(reward)
+            if not(reward == None): self.inputGenerator.feedback(reward)
             return self.state, done, timeout
         except Exception as e:
             import traceback
