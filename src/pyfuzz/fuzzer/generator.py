@@ -98,14 +98,19 @@ class InputGenerator:
         assert(self.s == 1 and self.state != None)
         self.s = 0
         self.counter += 1
-        
-        for tx in self.state.txList:
-            if tx == None:
-                continue
-            if score:
-                self.func_history_delta[tx.hash][0] += 1
-            else:
-                self.func_history_delta[tx.hash][1] += 1
+        funcs = [funcName for funcName in score]
+
+        for i in range(len(self.state.txList)):
+            if self.state.txList[i] == None: continue
+            self.func_history_delta[0] += score[funcs[i]]
+
+        # for tx in self.state.txList:
+        #     if tx == None:
+        #         continue
+        #     if score:
+        #         self.func_history_delta[tx.hash][0] += 1
+        #     else:
+        #         self.func_history_delta[tx.hash][1] += 1
         
         if self.counter >= self.stage_capacity:
             self.clear_stage()
