@@ -167,7 +167,8 @@ class Fuzzer():
             if not trace:
                 trace = []
             traces.append(trace)
-        
+        return traces
+        """       
         # if there is any call
         if sum(calls) > 0:
             state = []
@@ -183,6 +184,7 @@ class Fuzzer():
                 if trace:
                     traces.append(trace)
         return traces
+        """
 
     def loadSeed(self, txList, pcs, more_seeds=[]):
         """

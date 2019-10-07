@@ -34,7 +34,6 @@ class InputGenerator:
         self.state = None
 
     def generate(self):
-        assert(self.s == 0)
         self.s = 1
         self.state = State(self._gen_blank_txs())
         return self.state
@@ -95,7 +94,7 @@ class InputGenerator:
         return self.state         
 
     def feedback(self, score):
-        assert(self.s == 1 and self.state != None)
+        assert(self.state != None)
         self.s = 0
         self.counter += 1
         
