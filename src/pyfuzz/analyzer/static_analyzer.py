@@ -2,6 +2,7 @@ from pyfuzz.analyzer.ir_analyzer import Visitor, IrAnalyzer
 import eth_utils
 from types import MethodType
 from slither.core.expressions import *
+from slither.solc_parsing.declarations.function import *
 
 def print_reports(reports):
     if isinstance(reports, list):
@@ -88,6 +89,19 @@ class AnalysisReport():
     def is_function_critical(self, func_hash):
         return self.get_feature(func_hash)["call"] > 0
 
+    def _function_read(self, function):
+        result = function._vars_read
+        for call in function.internal_calls:
+            if isinstance(call, FunctionSolc):
+                result.extend(self._function_read(call))
+        return list(set(result))
+
+    def _function_written(self, function):
+        result = function._vars_written
+        for call in function.internal_calls:
+            if isinstance(call, FunctionSolc):
+                result.extend(self._function_written(call))
+        return list(set(result))
 
 class StaticAnalyzer(IrAnalyzer):
     def __init__(self, filename=None, contract_name=None):

@@ -126,14 +126,14 @@ class InputGenerator:
                 return self.contractAnalysisReport.is_function_critical(txHash)
             else:
                 f = self.contractAnalysisReport.get_function(txHash)
-                write_set = set(f._vars_written)
+                write_set = set(self.contractAnalysisReport._function_written(f))
                 read_set = set([])
                 for i in range(index + 1, len(txList)):
                     tmpHash = txList[i].hash
                     f = self.contractAnalysisReport.get_function(tmpHash)
                     if f == None:
                         raise False
-                    read_set = read_set.union(f._vars_read)
+                    read_set = read_set.union(self.contractAnalysisReport._function_read(f))
                 return (len(read_set.intersection(write_set)) > 0)
         except Exception as e:
             import traceback
