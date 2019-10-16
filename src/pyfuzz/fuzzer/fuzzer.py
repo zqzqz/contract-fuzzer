@@ -222,6 +222,8 @@ class Fuzzer():
 
         self.traces = []
         self.report = []
+        self.contractAbi = ContractAbi(self.contract, list(self.accounts.keys()))
+        self.contractMap[self.filename]["visited"] = set([])
         return self.state
 
     def random_reset(self, datadir):
