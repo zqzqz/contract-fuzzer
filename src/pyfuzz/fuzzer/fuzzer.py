@@ -160,10 +160,9 @@ class Fuzzer():
             trace, state = self.runOneTx(tx, opts)
             new_seeds = self.traceAnalyzer.get_seed_candidates([trace])
             for s in new_seeds:
-                fillSeeds(s[1], s[0], seeds)
+                seeds = fillSeeds(s[1], s[0], seeds)
             for i in range(len(tx.typedArgs)):
-                fillSeeds(tx.typedArgs[i][1], tx.typedArgs[i][0], seeds)
-
+                seeds = fillSeeds(tx.typedArgs[i][1], tx.typedArgs[i][0], seeds)
             if not trace:
                 trace = []
             traces.append(trace)
@@ -208,7 +207,7 @@ class Fuzzer():
             seeds = self.contractAbi.seedMap[txList[i].hash]
             
             for i in range(len(txList[i].typedArgs)):
-                fillSeeds(txList[i].typedArgs[i][1], txList[i].typedArgs[i][0], seeds[i])
+                seeds = fillSeeds(txList[i].typedArgs[i][1], txList[i].typedArgs[i][0], seeds)
         return True
 
     def reset(self):

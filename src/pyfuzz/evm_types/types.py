@@ -95,7 +95,10 @@ def castTypes(value, _type):
             hexStr = "0x" + "0" * (40 - len(hexStr)) + hexStr
         return hexStr
     elif _type["type"] == "string":
-        return bytes.fromhex(hexStr).decode('utf-8')
+        try:
+            return bytes.fromhex(hexStr).decode('utf-8')
+        except:
+            return None
     else:
         return None
 
@@ -130,9 +133,9 @@ def fillSeeds(value, type_str, seeds):
             value = castTypes(value, _type)
         if isType(value, _type):
             seeds[type_str].append(value)
+        return seeds
     except Exception as e:
-        raise Exception("error filling seeds {}".format(str(e)))
-
+        return seeds
 
 class TypeHandler():
     def __init__(self, _seed_dir=seed_dir, _type_list=type_list, _mode_list=mode_list):

@@ -59,7 +59,7 @@ class InputGenerator:
             condition = conditions[_id]
             # add seeds of state values
             for s in condition["states"]:
-                s_type = cleanTypeNames(s["type"])
+                s_type = cleanTypeNames(s._type)
                 if s_type != None:
                     continue
                 for d in condition["deps"]:
@@ -67,7 +67,7 @@ class InputGenerator:
                         continue
                     p_type = cleanTypeNames(paras[d.name]["type"])
                     if s_type == p_type:
-                        fillSeeds(s["value"], s_type, res_seeds[paras[d.name]["index"]])
+                        fres_seeds[paras[d.name]["index"]] = illSeeds(s["value"], s_type, res_seeds[paras[d.name]["index"]])
             # constant literal values
             for n in condition["consts"]:
                 if not isinstance(n, str):
@@ -77,16 +77,15 @@ class InputGenerator:
                         continue
                     p_type = cleanTypeNames(paras[d.name]["type"])
                     if isHexString(n) and p_type == "bytes32":
-                        fillSeeds(n, p_type, res_seeds[paras[d.name]["index"]])
+                        res_seeds[paras[d.name]["index"]] = fillSeeds(n, p_type, res_seeds[paras[d.name]["index"]])
                     if isIntString(n) and p_type == "uint256":
-                        fillSeeds(int(n,10), p_type, res_seeds[paras[d.name]["index"]])
+                        res_seeds[paras[d.name]["index"]] = fillSeeds(int(n,10), p_type, res_seeds[paras[d.name]["index"]])
         # other seeds
-        for s in seeds:
-            type_str = s[0]
-            value = s[1]
-            for p in paras:
-                if paras[p]["type"] == type_str:
-                    fillSeeds(value, type_str, res_seeds[paras[p]["index"]])
+        for p in paras:
+            type_str = paras[p]["type"]     
+            if type_str in seeds:
+                for value in seeds[type_str]:
+                    res_seeds[paras[p]["index"]] = fillSeeds(value, type_str, res_seeds[paras[p]["index"]])
 
         # generate transaction
         tx = self.contractAbi.generateTx(funcHash, res_seeds)

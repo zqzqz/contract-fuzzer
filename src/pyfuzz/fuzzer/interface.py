@@ -39,8 +39,8 @@ class Transaction:
     def __repr__(self):
         return "name: {}, args: {}, sender: {}, value: {}".format(self.name, self.args, self.sender, self.value)
 
-    def __eq__(self, other):
-        return self.__class__ == self.__class__ and self.__repr__() == self.__repr__()
+    # def __eq__(self, other):
+    #     return self.__class__ == self.__class__ and self.__repr__() == self.__repr__()
 
     def updateVisited(self):
         self.tmp_visited += 1

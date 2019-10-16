@@ -2,7 +2,7 @@ import os
 
 FUZZ_CONFIG = {
     "max_call_num": 3,
-    "seed_prob": 0.4,
+    "seed_prob": 0.5,
     "account_balance": "0xffffffffffffffffffffffffffffffffffffffffffffffff",
     "max_attempt": 1000
 }

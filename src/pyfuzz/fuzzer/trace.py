@@ -36,7 +36,7 @@ class TraceAnalyzer:
                     sha_pc = state["pc"]
                 elif sha_pc >= 0:
                     try:
-                        seeds.append(("bytes", bytearray.fromhex(state["stack"][-1].lstrip("0x"))))
+                        pass # seeds.append(("bytes", bytearray.fromhex(state["stack"][-1].lstrip("0x"))))
                     except:
                         pass
                     sha_pc = -1
