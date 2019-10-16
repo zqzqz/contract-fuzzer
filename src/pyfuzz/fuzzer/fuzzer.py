@@ -135,7 +135,6 @@ class Fuzzer():
         calls = []
         state = []
         seeds = TypeHandler().seeds
-
         self.contractAddress = self.evm.deploy(self.contract)
         if not self.contractAddress:
             raise Exception("fuzzer: cannot deploy contract")
@@ -207,7 +206,8 @@ class Fuzzer():
             seeds = self.contractAbi.seedMap[txList[i].hash]
             
             for i in range(len(txList[i].typedArgs)):
-                seeds = fillSeeds(txList[i].typedArgs[i][1], txList[i].typedArgs[i][0], seeds)
+                pass
+                # seeds[i] = fillSeeds(txList[i].typedArgs[i][1], txList[i].typedArgs[i][0], seeds[i])
         return True
 
     def reset(self):

@@ -39,6 +39,7 @@ class InputGenerator:
         return self.state
 
     def fill(self, index, seeds):
+        import copy
         assert(self.state and index >=0 and index < len(self.state.txList))
         if self.state.txList[index] == None:
             return
@@ -52,7 +53,7 @@ class InputGenerator:
             paras[_input["name"]] = _input
 
         # add seeds
-        res_seeds = self.contractAbi.seedMap[funcHash]
+        res_seeds = copy.deepcopy(self.contractAbi.seedMap[funcHash])
         conditions = self.contractAnalysisReport.get_conditions(funcHash)
         # conditions
         for _id in conditions:
