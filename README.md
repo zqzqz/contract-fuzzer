@@ -29,17 +29,7 @@ npm run start
 
 * Configure the fuzzer
 
-See `src/pyfuzz/config.py`
-
-* Train the model
-
-```bash
-cd src
-python -m pyfuzz train --datadir PATH_TO_CONTRACTS --exploit --episode 100
-```
-
-Option `--exploit` indicates that the model targets on finding exploitations. Otherwise the model will find vulnerabilities with option `--vulnerability`  
-Currently we support detection of 4 vulnerabilities: **TimestampDependency**, **BlockNumberDependency**, **UnhandledException** and **Reentrancy**.  
+See `src/pyfuzz/config.py` 
 
 * Fuzz contracts
 
@@ -47,6 +37,9 @@ Currently we support detection of 4 vulnerabilities: **TimestampDependency**, **
 cd src
 python -m pyfuzz fuzz --datadir PATH_TO_CONTRACTS --exploit
 ```
+
+Option `--exploit` indicates that the model targets on finding exploitations. Otherwise the model will find vulnerabilities with option `--vulnerability`  
+Currently we support detection of 4 vulnerabilities: **TimestampDependency**, **BlockNumberDependency**, **UnhandledException** and **Reentrancy**. 
 
 The fuzzer try various inputs to the contracts and print exploitations like:
 
