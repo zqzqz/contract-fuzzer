@@ -19,7 +19,7 @@ class TraceAnalyzer:
           reward (int): calculated reward
     """
     def run(self, ptraces, ctraces):
-        reward, jumps = self.path_variaty(ptraces, ctraces)
+        reward, jumps, _ = self.path_variaty(ptraces, ctraces)
         reward *= FUZZ_CONFIG["path_variaty_reward"]
         seeds = self.get_seed_candidates(ctraces)
         report = list(set(self.detector.run(ctraces)))
@@ -54,6 +54,7 @@ class TraceAnalyzer:
         pJumps = []
         cJumps = []
         ret_jumps = []
+        ret_jumpi = []
         for ptrace in ptraces:
             for state in ptrace:
                 if state["op"] in branch_op:
@@ -64,11 +65,14 @@ class TraceAnalyzer:
                 if state["op"] in branch_op:
                     tmp_jumps.append(state["pc"])
                     cJumps.append(state["pc"])
+                    if state["op"] == "JUMPI":
+                        ret_jumpi.append(state["pc"])
             ret_jumps.append(set(tmp_jumps))
 
         pJumps = list(set(pJumps))
         cJumps = list(set(cJumps))
         difJumps = list(set(pJumps + cJumps))
+        ret_jumpi = list(set(ret_jumpi))
         # print(difJumps, pJumps, cJumps)
         if len(difJumps) == 0:
             reward = 0
@@ -76,4 +80,4 @@ class TraceAnalyzer:
             comJumpNum = len(pJumps) + len(cJumps) - len(difJumps)
             reward = (len(pJumps) + len(cJumps) -
                       2 * comJumpNum) / len(difJumps)
-        return reward, ret_jumps
+        return reward, ret_jumps, ret_jumpi

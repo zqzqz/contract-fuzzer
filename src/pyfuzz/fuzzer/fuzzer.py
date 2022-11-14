@@ -4,10 +4,11 @@ from pyfuzz.trainer.model import Action, ActionProcessor, State, StateProcessor
 from pyfuzz.fuzzer.trace import TraceAnalyzer, branch_op
 from pyfuzz.analyzer.static_analyzer import StaticAnalyzer, AnalysisReport
 from pyfuzz.fuzzer.detector.exploit import Exploit
-from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG
+from pyfuzz.fuzzer.mythril_concolic import MythrilConcolic
+from pyfuzz.config import TRAIN_CONFIG, DIR_CONFIG, FUZZ_CONFIG, CONCOLIC_CONFIG
 
 import logging
-from random import randint, choice
+from random import shuffle, randint, choice
 import json
 import os
 
@@ -23,6 +24,8 @@ class Fuzzer():
             self.opts["exploit"] = False
         if "vulnerability" not in opts:
             self.opts["vulnerability"] = False
+        if "concolic" not in opts:
+            self.opts["concolic"] = False
         # init evm handler
         if evmEndPoint:
             self.evm = EvmHandler(evmEndPoint)
@@ -55,6 +58,10 @@ class Fuzzer():
         # analyzers
         self.traceAnalyzer = TraceAnalyzer(opts)
         self.staticAnalyzer = StaticAnalyzer()
+
+        self.mythrilConcolic = None
+        self.concolicCnt = 0
+        self.concolicWait = CONCOLIC_CONFIG["initial_wait"]
         # for test
         self.counter = 0
         # eth accounts as seeds of type address
@@ -77,6 +84,7 @@ class Fuzzer():
             self.contractMap[filename]["abi"] = ContractAbi(self.contract)
             self.contractAbi = self.contractMap[filename]["abi"]
             self.contractAnalysisReport = self.contractMap[filename]["report"]
+            self.mythrilConcolic = MythrilConcolic(self.contract["runtime_bytecode"], self.contractAbi)
             return True
         else:
             try:
@@ -98,6 +106,7 @@ class Fuzzer():
                     "report": self.contractAnalysisReport,
                     "visited": set([])
                 }
+                self.mythrilConcolic = MythrilConcolic(self.contract["runtimeBytecode"], self.contractAbi)
                 return True
             except Exception as e:
                 logger.exception("fuzz.loadContract: {}".format(str(e)))
@@ -322,12 +331,28 @@ class Fuzzer():
         self.counter += 1
         reward = 0
         timeout = 0
+        p_coverage = self.coverage()
+        # print(self.state.txList)
         try:
             # testing
             if self.counter >= FUZZ_CONFIG["max_attempt"]:
                 timeout = 1
-            action = self.actionProcessor.decodeAction(action)
-            nextState = self.mutate(self.state, action)
+            # concolic
+            nextState = None
+            if self.opts["concolic"] and self.concolicCnt >= self.concolicWait:
+                _, _, jumpi = self.traceAnalyzer.path_variaty(self.traces, self.traces)
+                # print(jumpi)
+                print("start concolic")
+                result = self.mythrilConcolic.run(self.state.txList, jumpi)
+                if len(result) > 0:
+                    nextState = State(self.state.staticAnalysis, result)
+                self.concolicCnt = 0
+                if nextState:
+                    self.concolicWait = max(1, int(self.concolicWait/CONCOLIC_CONFIG["concolic_reward"]/CONCOLIC_CONFIG["concolic_penalty"]))
+            else:
+                action = self.actionProcessor.decodeAction(action)
+                nextState = self.mutate(self.state, action)
+
             if not nextState:
                 state, seqLen = self.stateProcessor.encodeState(self.state)
                 return state, seqLen, reward, done, timeout
@@ -361,12 +386,20 @@ class Fuzzer():
             # testing
             if len(report) > 0:
                 done = 1
+
+            if p_coverage == self.coverage():
+                self.concolicCnt += 1
+            else:
+                self.concolicCnt = 0
+                self.concolicWait = int(self.concolicWait * CONCOLIC_CONFIG["concolic_penalty"])
             # update
             self.state = nextState
             self.traces = traces
             # should exclude repeated reports
             self.report = list(set(self.report + report))
             state, seqLen = self.stateProcessor.encodeState(self.state)
+            _, _, jumpi = self.traceAnalyzer.path_variaty(self.traces, self.traces)
+            print(self.coverage(), jumpi)
             return state, seqLen, reward, done, timeout
         except Exception as e:
             logger.error("fuzzer.step: {}".format(str(e)))

@@ -33,6 +33,15 @@ FUZZ_CONFIG = {
     "path_discovery_reward": 0.3
 }
 
+CONCOLIC_CONFIG = {
+    "concolic_reward": 1.4,
+    "concolic_penalty": 1.2,
+    "initial_wait": 10,
+    "success_flip_penalty": 0.9,
+    "failed_flip_penalty": 0.75,
+    "jump_addr_cooldown": 2
+}
+
 DIR_CONFIG = {}
 DIR_CONFIG["experiment_dir"] = os.path.join(os.path.dirname(__file__), "experiments")
 DIR_CONFIG["seed_dir"] = os.path.join(os.path.dirname(__file__), "evm_types/seed")

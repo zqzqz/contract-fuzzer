@@ -49,6 +49,7 @@ function compileWrapper(sourceObj) {
     if (contract.functionHashes) sim_contract.functionHashes = contract.functionHashes
     if (contract.bytecode) sim_contract.bytecode = contract.bytecode
     if (contract.opcodes) sim_contract.opcodes = contract.opcodes
+    if (contract.runtimeBytecode) sim_contract.runtimeBytecode = contract.runtimeBytecode
     return {
       data: JSON.stringify(sim_contract)
     };

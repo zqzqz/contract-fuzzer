@@ -149,13 +149,14 @@ def main():
                         default=False, const=True, help="find exploitations")
     parser.add_argument("--random", action='store_const',
                         default=False, const=True, help="omit model and use random actions")
+    parser.add_argument("--concolic", action='store_const',
+                        default=False, const=True, help="use mythril's concolic executor")
     parser.add_argument("--vulnerability", action='store_const',
                         default=False, const=True, help="find vulnerabilities")
     parser.add_argument("--repeat", type=int,
                         help="repeated number of testing", default=10)
     parser.add_argument("--timeout", type=int,
                         help="timeout", default=120)    
-
     args = parser.parse_args()
     if not os.path.isdir(args.datadir):
         logger.exception("wrong datadir")
@@ -166,7 +167,8 @@ def main():
         rand_prob = FUZZ_CONFIG["random_action_prob"]
     opts = {
         "exploit": args.exploit,
-        "vulnerability": args.vulnerability
+        "vulnerability": args.vulnerability,
+        "concolic": args.concolic
     }
     if args.cmd == "train":
         train(args.datadir, args.episode, opts)
