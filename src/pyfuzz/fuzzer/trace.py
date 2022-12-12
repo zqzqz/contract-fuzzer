@@ -19,7 +19,7 @@ class TraceAnalyzer:
           reward (int): calculated reward
     """
     def run(self, ptraces, ctraces):
-        reward, jumps, _ = self.path_variaty(ptraces, ctraces)
+        reward, jumps, _, paths = self.path_variaty(ptraces, ctraces)
         reward *= FUZZ_CONFIG["path_variaty_reward"]
         seeds = self.get_seed_candidates(ctraces)
         report = list(set(self.detector.run(ctraces)))
@@ -28,7 +28,7 @@ class TraceAnalyzer:
                 reward += FUZZ_CONFIG["vulnerability_reward"]
             elif isinstance(rep, Exploit):
                 reward += FUZZ_CONFIG["exploit_reward"]
-        return reward, report, jumps, seeds
+        return reward, report, jumps, seeds, paths
 
     def get_seed_candidates(self, ctraces):
         seeds = []
@@ -55,24 +55,29 @@ class TraceAnalyzer:
         cJumps = []
         ret_jumps = []
         ret_jumpi = []
+        ret_paths = []
         for ptrace in ptraces:
             for state in ptrace:
                 if state["op"] in branch_op:
                     pJumps.append(state["pc"])
         for ctrace in ctraces:
             tmp_jumps = []
+            tmp_path = ""
             for state in ctrace:
+                tmp_path += hex(state["pc"])[2:]
                 if state["op"] in branch_op:
                     tmp_jumps.append(state["pc"])
                     cJumps.append(state["pc"])
                     if state["op"] == "JUMPI":
                         ret_jumpi.append(state["pc"])
             ret_jumps.append(set(tmp_jumps))
+            ret_paths.append(hash(tmp_path))
 
         pJumps = list(set(pJumps))
         cJumps = list(set(cJumps))
         difJumps = list(set(pJumps + cJumps))
         ret_jumpi = list(set(ret_jumpi))
+
         # print(difJumps, pJumps, cJumps)
         if len(difJumps) == 0:
             reward = 0
@@ -80,4 +85,4 @@ class TraceAnalyzer:
             comJumpNum = len(pJumps) + len(cJumps) - len(difJumps)
             reward = (len(pJumps) + len(cJumps) -
                       2 * comJumpNum) / len(difJumps)
-        return reward, ret_jumps, ret_jumpi
+        return reward, ret_jumps, ret_jumpi, ret_paths

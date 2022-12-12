@@ -125,8 +125,10 @@ def fuzz(datadir, output, repeat_num, rand_prob, set_timeout, opts):
                 except:
                     pass
 
-                logger.info("contract {} finished with counter {}".format(
-                    filename, env.counter))
+                # logger.info("contract {} finished with counter {}, coverage: {}".format(
+                    # filename, env.counter, env.coverage()))
+                print("contract {} finished with counter {}, coverage: {}".format(
+                    filename, env.counter, env.coverage()))
                 report[filename][i]["coverage"] = env.coverage()
                 report[filename][i]["attempt"] = env.counter
 
@@ -151,12 +153,15 @@ def main():
                         default=False, const=True, help="omit model and use random actions")
     parser.add_argument("--concolic", action='store_const',
                         default=False, const=True, help="use mythril's concolic executor")
+    parser.add_argument("--path", action='store_const',
+                        default=False, const=True, help="use path coverage instead of edge coverage")
     parser.add_argument("--vulnerability", action='store_const',
                         default=False, const=True, help="find vulnerabilities")
     parser.add_argument("--repeat", type=int,
                         help="repeated number of testing", default=10)
     parser.add_argument("--timeout", type=int,
                         help="timeout", default=120)    
+
     args = parser.parse_args()
     if not os.path.isdir(args.datadir):
         logger.exception("wrong datadir")
@@ -168,7 +173,8 @@ def main():
     opts = {
         "exploit": args.exploit,
         "vulnerability": args.vulnerability,
-        "concolic": args.concolic
+        "concolic": args.concolic,
+        "path-coverage": args.path
     }
     if args.cmd == "train":
         train(args.datadir, args.episode, opts)

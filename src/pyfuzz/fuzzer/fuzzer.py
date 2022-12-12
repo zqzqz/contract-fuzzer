@@ -26,6 +26,8 @@ class Fuzzer():
             self.opts["vulnerability"] = False
         if "concolic" not in opts:
             self.opts["concolic"] = False
+        if "path-coverage" not in opts:
+            self.opts["path-coverage"] = False
         # init evm handler
         if evmEndPoint:
             self.evm = EvmHandler(evmEndPoint)
@@ -156,18 +158,20 @@ class Fuzzer():
                     traces.append(trace)
         return traces
 
-    def loadSeed(self, txList, pcs, more_seeds=[]):
+    def loadSeed(self, txList, visited, more_seeds=[]):
         """
         add arguments of a tx list to seeds
         """
         new_path_flag = False
 
-        visitedPcList = self.contractMap[self.filename]["visited"]
+        visitedList = self.contractMap[self.filename]["visited"]
         j = 0
         for i in range(len(txList)):
             if not txList[i]:
                 continue
-            if pcs[i].issubset(visitedPcList):
+            if not self.opts["path-coverage"] and visited[i].issubset(visitedList):
+                continue
+            if self.opts["path-coverage"] and visited[i] in visitedList:
                 continue
 
             logger.debug("find new path")
@@ -176,8 +180,12 @@ class Fuzzer():
             seeds = self.contractAbi.typeHandlers[txList[i].hash].seeds
             
             new_path_flag = True
-            self.contractMap[self.filename]["visited"] = visitedPcList.union(pcs[i])
             
+            if self.opts["path-coverage"]:
+                self.contractMap[self.filename]["visited"] = visitedList.union({visited[i]})
+            else:
+                self.contractMap[self.filename]["visited"] = visitedList.union(visited[i])
+
             for arg in txList[i].typedArgs:
                 if arg[0] not in seeds:
                     seeds[arg[0]] = [arg[1]]
@@ -340,7 +348,7 @@ class Fuzzer():
             # concolic
             nextState = None
             if self.opts["concolic"] and self.concolicCnt >= self.concolicWait:
-                _, _, jumpi = self.traceAnalyzer.path_variaty(self.traces, self.traces)
+                _, _, jumpi, _ = self.traceAnalyzer.path_variaty(self.traces, self.traces)
                 # print(jumpi)
                 print("start concolic")
                 result = self.mythrilConcolic.run(self.state.txList, jumpi)
@@ -359,12 +367,13 @@ class Fuzzer():
             # execute transactions
             traces = self.runTxs(nextState.txList)
             # get reward of executions
-            reward, report, pcs, seeds = self.traceAnalyzer.run(self.traces, traces)
+            reward, report, pcs, seeds, paths = self.traceAnalyzer.run(self.traces, traces)
             self.traces = traces
             # bonus for valid mutation
             reward += FUZZ_CONFIG["valid_mutation_reward"]
             # update seeds
-            if self.loadSeed(nextState.txList, pcs, seeds):
+            tmp_visited = paths if self.opts["path-coverage"] else pcs
+            if self.loadSeed(nextState.txList, tmp_visited, seeds):
                 reward += FUZZ_CONFIG["path_discovery_reward"]
             # check whether exploitation happens
             if self.opts["exploit"]:
@@ -398,7 +407,7 @@ class Fuzzer():
             # should exclude repeated reports
             self.report = list(set(self.report + report))
             state, seqLen = self.stateProcessor.encodeState(self.state)
-            _, _, jumpi = self.traceAnalyzer.path_variaty(self.traces, self.traces)
+            _, _, jumpi, _= self.traceAnalyzer.path_variaty(self.traces, self.traces)
             print(self.coverage(), jumpi)
             return state, seqLen, reward, done, timeout
         except Exception as e:
@@ -407,6 +416,8 @@ class Fuzzer():
             return state, seqLen, 0, 0, 1
 
     def coverage(self):
+        if self.opts["path-coverage"]:
+            return len(self.contractMap[self.filename]["visited"])
         jump_cnt = 0
         try:
             jump_cnt = self.contract["opcodes"].count("JUMP")

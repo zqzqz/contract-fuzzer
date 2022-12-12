@@ -88,7 +88,7 @@ class MythrilConcolic():
             "initialState": self.init_state,
             "steps": steps
         })
-        print(data)
+        # print(data)
         result_steps = []
         # print("data created")
         try:
