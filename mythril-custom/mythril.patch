@@ -1,0 +1,4 @@
+240c240
+<         minimize.append(transaction.call_data.calldatasize)
+---
+>         # minimize.append(transaction.call_data.calldatasize)
